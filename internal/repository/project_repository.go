@@ -12,7 +12,7 @@ type Project struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Status      bool   `json:"status"`
-	ShardCount  int    `json:"shard_count"`
+	NodeCount   int    `json:"node_count"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -33,10 +33,10 @@ func (r *ProjectRepository) ProjectAdd(
 		ID:          uuid.New().String(),
 		Name:        name,
 		Description: description,
-		ShardCount:  0,
+		NodeCount:   0,
 	}
-	query := `INSERT INTO projects (id,name,description,shard_count) VALUES ($1,$2,$3,$4) RETURNING status, created_at, updated_at`
-	err := r.db.QueryRowContext(ctx, query, project.ID, project.Name, project.Description, project.ShardCount).Scan(&project.Status, &project.CreatedAt, &project.UpdatedAt)
+	query := `INSERT INTO projects (id,name,description,node_count) VALUES ($1,$2,$3,$4) RETURNING status, created_at, updated_at`
+	err := r.db.QueryRowContext(ctx, query, project.ID, project.Name, project.Description, project.NodeCount).Scan(&project.Status, &project.CreatedAt, &project.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (r *ProjectRepository) ProjectRemove(ctx context.Context, id string) error 
 
 func (r *ProjectRepository) ProjectList(ctx context.Context) ([]*Project, error) {
 
-	query := `SELECT id,name,description,shard_count,status,created_at,updated_at FROM projects ORDER BY created_at DESC`
+	query := `SELECT id,name,description,node_count,status,created_at,updated_at FROM projects ORDER BY created_at DESC`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (r *ProjectRepository) ProjectList(ctx context.Context) ([]*Project, error)
 	var projects []*Project
 	for rows.Next() {
 		project := &Project{}
-		err := rows.Scan(&project.ID, &project.Name, &project.Description, &project.ShardCount, &project.Status, &project.CreatedAt, &project.UpdatedAt)
+		err := rows.Scan(&project.ID, &project.Name, &project.Description, &project.NodeCount, &project.Status, &project.CreatedAt, &project.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -89,19 +89,43 @@ func (r *ProjectRepository) ProjectList(ctx context.Context) ([]*Project, error)
 	return projects, nil
 }
 
-func (r *ProjectRepository) GetProjectByID(ctx context.Context, id string) (Project, error) {
+func (r *ProjectRepository) ProjectGetByID(ctx context.Context, id string) (*Project, error) {
 	projectID, err := uuid.Parse(id)
 	if err != nil {
-		return Project{}, err
+		return nil, err
 	}
 
-	query := `SELECT id,name,description,shard_count,status,created_at,updated_at FROM projects WHERE id = $1`
+	query := `SELECT id,name,description,node_count,status,created_at,updated_at FROM projects WHERE id = $1`
 	row := r.db.QueryRowContext(ctx, query, projectID)
 
 	project := &Project{}
-	err = row.Scan(&project.ID, &project.Name, &project.Description, &project.ShardCount, &project.Status, &project.CreatedAt, &project.UpdatedAt)
+	err = row.Scan(&project.ID, &project.Name, &project.Description, &project.NodeCount, &project.Status, &project.CreatedAt, &project.UpdatedAt)
 	if err != nil {
-		return Project{}, err
+		return nil, err
 	}
-	return *project, nil
+	return project, nil
+}
+
+func (r *ProjectRepository) ProjectUpdateStatus(ctx context.Context, status bool, id string) (*Project, error) {
+	projectID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+	project := &Project{}
+
+	query := `UPDATE projects SET status = $1 WHERE id = $2 RETURNING id,name,description,node_count,status,created_at,updated_at`
+	err = r.db.QueryRowContext(ctx, query, status, projectID).Scan(
+		&project.ID,
+		&project.Name,
+		&project.Description,
+		&project.NodeCount,
+		&project.Status,
+		&project.CreatedAt,
+		&project.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return project, nil
 }
