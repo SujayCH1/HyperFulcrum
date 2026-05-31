@@ -19,11 +19,11 @@ type Project struct {
 }
 
 type ProjectRepository struct {
-	db *sql.DB
+	conn *sql.DB
 }
 
-func NewProjectRepository(db *sql.DB) *ProjectRepository {
-	return &ProjectRepository{db: db}
+func NewProjectRepository(connConfig *sql.DB) *ProjectRepository {
+	return &ProjectRepository{conn: connConfig}
 }
 
 func (r *ProjectRepository) ProjectAdd(
@@ -36,7 +36,7 @@ func (r *ProjectRepository) ProjectAdd(
 		NodeCount:   0,
 	}
 	query := `INSERT INTO projects (id,name,description,node_count) VALUES ($1,$2,$3,$4) RETURNING status, created_at, updated_at`
-	err := r.db.QueryRowContext(ctx, query, project.ID, project.Name, project.Description, project.NodeCount).Scan(&project.Status, &project.CreatedAt, &project.UpdatedAt)
+	err := r.conn.QueryRowContext(ctx, query, project.ID, project.Name, project.Description, project.NodeCount).Scan(&project.Status, &project.CreatedAt, &project.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (r *ProjectRepository) ProjectRemove(ctx context.Context, id string) error 
 	}
 
 	query := `DELETE FROM projects WHERE id = $1`
-	result, err := r.db.ExecContext(ctx, query, projectID)
+	result, err := r.conn.ExecContext(ctx, query, projectID)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (r *ProjectRepository) ProjectRemove(ctx context.Context, id string) error 
 func (r *ProjectRepository) ProjectList(ctx context.Context) ([]*Project, error) {
 
 	query := `SELECT id,name,description,node_count,status,created_at,updated_at FROM projects ORDER BY created_at DESC`
-	rows, err := r.db.QueryContext(ctx, query)
+	rows, err := r.conn.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (r *ProjectRepository) ProjectGetByID(ctx context.Context, id string) (*Pro
 	}
 
 	query := `SELECT id,name,description,node_count,status,created_at,updated_at FROM projects WHERE id = $1`
-	row := r.db.QueryRowContext(ctx, query, projectID)
+	row := r.conn.QueryRowContext(ctx, query, projectID)
 
 	project := &Project{}
 	err = row.Scan(&project.ID, &project.Name, &project.Description, &project.NodeCount, &project.Status, &project.CreatedAt, &project.UpdatedAt)
@@ -114,7 +114,7 @@ func (r *ProjectRepository) ProjectUpdateStatus(ctx context.Context, status bool
 	project := &Project{}
 
 	query := `UPDATE projects SET status = $1 WHERE id = $2 RETURNING id,name,description,node_count,status,created_at,updated_at`
-	err = r.db.QueryRowContext(ctx, query, status, projectID).Scan(
+	err = r.conn.QueryRowContext(ctx, query, status, projectID).Scan(
 		&project.ID,
 		&project.Name,
 		&project.Description,

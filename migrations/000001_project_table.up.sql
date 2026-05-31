@@ -1,4 +1,4 @@
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
     id UUID PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
     description TEXT NOT NULL DEFAULT '',
