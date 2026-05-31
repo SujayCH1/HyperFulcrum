@@ -14,6 +14,7 @@ FROM alpine:latest
 WORKDIR /root/
 
 COPY --from=builder /app/hyperfulcrum .
+COPY --from=builder /app/migrations ./migrations  
 
 EXPOSE 8080
 
