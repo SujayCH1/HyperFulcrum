@@ -35,7 +35,7 @@ func (s *ConnectionStore) Set(projectID string, shardID string, db *sql.DB) {
 	s.conns[projectID][shardID] = db
 }
 
-func (s *ConnectionStore) Get(projectID, shardID string) (*sql.DB, error) {
+func (s *ConnectionStore) Get(projectID string, shardID string) (*sql.DB, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
