@@ -224,3 +224,40 @@ func (r *ProjectRepository) ProjectUpdateRunning(ctx context.Context, id string,
 
 	return project, nil
 }
+
+
+func (r *ProjectRepository) ProjectGetReady(ctx context.Context) ([]*Project, error) {
+	query := `SELECT id,name,description,node_count,ready,running,created_at,updated_at 
+	FROM projects WHERE ready=TRUE`
+
+	rows, err := r.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []*Project
+	for rows.Next() {
+		project := &Project{}
+		err := rows.Scan(&project.ID,
+			&project.Name,
+			&project.Description,
+			&project.NodeCount,
+			&project.Ready,
+			&project.Running,
+			&project.CreatedAt,
+			&project.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		projects = append(projects, project)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(projects) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return projects, nil
+}
