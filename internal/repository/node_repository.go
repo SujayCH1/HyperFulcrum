@@ -189,7 +189,7 @@ func (r *NodeRepository) NodeUpdateStatus(ctx context.Context, nodeID string, st
 	return nil
 }
 
-func (r *NodeRepository) UpdateType(ctx context.Context, nodeID string, nodeType string) error {
+func (r *NodeRepository) NodeUpdateType(ctx context.Context, nodeID string, nodeType string) error {
 	if nodeType != "shard" && nodeType != "replica" {
 		return fmt.Errorf("invalid node type: %s", nodeType)
 	}
@@ -211,6 +211,40 @@ func (r *NodeRepository) UpdateType(ctx context.Context, nodeID string, nodeType
 	}
 
 	return nil
+}
+
+func (r *NodeRepository) NodeGetByPorjectID(ctx context.Context, projectID string) (Node, error) {
+
+	query := `
+		SELECT 
+		id, project_id, node_name, node__index, node_status, node_type, created_at
+		FROM nodes
+		WHERE project_id = $1
+	`
+
+	row := r.conn.QueryRowContext(
+		ctx,
+		query,
+		projectID,
+	)
+
+	var node Node
+
+	err := row.Scan(
+		&node.ID,
+		&node.ProjectID,
+		&node.Name,
+		&node.Index,
+		&node.Status,
+		&node.Type,
+		&node.CreatedAt,
+	)
+	if err != nil {
+		return Node{}, err
+	}
+
+	return node, nil
+
 }
 
 // helpers
