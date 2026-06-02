@@ -5,14 +5,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/http"
-
+	"hyperfulcrum/internal/api/handlers"
 	"hyperfulcrum/internal/api/router"
 	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/connections"
 	"hyperfulcrum/internal/database"
 	"hyperfulcrum/internal/repository"
 	"hyperfulcrum/pkg/logger"
+	"net/http"
 )
 
 type Application struct {
@@ -25,6 +25,9 @@ type Application struct {
 	ProjectRepo  *repository.ProjectRepository
 	NodeRepo     *repository.NodeRepository
 	NodeConnRepo *repository.NodeConnectionRepository
+	
+	// handlers
+	ProjectHandler *handlers.ProjectHandler
 
 	// connection pool
 	ConnectionStore   *connections.ConnectionStore
@@ -101,9 +104,18 @@ func (a *Application) Start(ctx context.Context) error {
 	//API Server
 	logger.Logger.Info("Initializing application server")
 
-	a.Server = router.NewRouter()
+	a.ProjectHandler = handlers.NewProjectHandler(a.ProjectRepo)
+	a.Server = router.NewRouter(a.ProjectHandler)
 
-	logger.Logger.Info("Appllication server initialized")
+	logger.Logger.Info("Application server initialized")
+
+	
+	go func() {
+		logger.Logger.Info("Starting HTTP server on :8080")
+		if err := http.ListenAndServe(":8080", a.Server); err != nil && err != http.ErrServerClosed {
+			logger.Logger.Error("HTTP server failed", "error", err)
+		}
+	}()
 
 	// application setup complete
 
