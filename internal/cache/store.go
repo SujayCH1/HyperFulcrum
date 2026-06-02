@@ -7,21 +7,18 @@ import (
 )
 
 type ProjectCacheStore struct {
-	mu sync.RWMutex
-	// key is projectID
+	mu       sync.RWMutex
 	projects map[string]repository.Project
 }
 
 type NodeCacheStore struct {
-	mu sync.RWMutex
-	// key is projectID
+	mu    sync.RWMutex
 	nodes map[string][]repository.Node
 }
 
 type ConnectionsCacheStore struct {
-	mu sync.RWMutex
-	// key is nodeID
-	connections map[string][]repository.NodeConnection
+	mu          sync.RWMutex
+	connections map[string]repository.NodeConnection
 }
 
 func NewProjectCacheStore() *ProjectCacheStore {
@@ -38,11 +35,11 @@ func NewNodeCacheStore() *NodeCacheStore {
 
 func NewConnectionCacheStore() *ConnectionsCacheStore {
 	return &ConnectionsCacheStore{
-		connections: make(map[string][]repository.NodeConnection),
+		connections: make(map[string]repository.NodeConnection),
 	}
 }
 
-// functions for Project cache
+// Project cache
 func (s *ProjectCacheStore) Set(projectID string, project repository.Project) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -65,7 +62,7 @@ func (s *ProjectCacheStore) Delete(projectID string) {
 	delete(s.projects, projectID)
 }
 
-// functions for Node cache
+// Node cache
 func (s *NodeCacheStore) Set(projectID string, nodes []repository.Node) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -88,25 +85,25 @@ func (s *NodeCacheStore) Delete(projectID string) {
 	delete(s.nodes, projectID)
 }
 
-// functions for Connections cache
-func (s *ConnectionsCacheStore) Set(projectID string, connections []repository.NodeConnection) {
+// Connection cache
+func (s *ConnectionsCacheStore) Set(nodeID string, connection repository.NodeConnection) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.connections[projectID] = connections
+	s.connections[nodeID] = connection
 }
 
-func (s *ConnectionsCacheStore) Get(projectID string) ([]repository.NodeConnection, bool) {
+func (s *ConnectionsCacheStore) Get(nodeID string) (repository.NodeConnection, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	connections, exists := s.connections[projectID]
-	return connections, exists
+	connection, exists := s.connections[nodeID]
+	return connection, exists
 }
 
-func (s *ConnectionsCacheStore) Delete(projectID string) {
+func (s *ConnectionsCacheStore) Delete(nodeID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	delete(s.connections, projectID)
+	delete(s.connections, nodeID)
 }

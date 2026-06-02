@@ -2,14 +2,12 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
-	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewDatabasePool(ctx context.Context) (*pgxpool.Pool, error) {
+func NewDatabasePool(ctx context.Context) (*sql.DB, error) {
 	dsn := fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		os.Getenv("DB_USER"),
@@ -19,24 +17,15 @@ func NewDatabasePool(ctx context.Context) (*pgxpool.Pool, error) {
 		os.Getenv("DB_NAME"),
 	)
 
-	config, err := pgxpool.ParseConfig(dsn)
+	conn, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	config.MaxConns = 20
-	config.MinConns = 5
-	config.MaxConnLifetime = time.Hour
-
-	pool, err := pgxpool.NewWithConfig(ctx, config)
+	err = conn.Ping()
 	if err != nil {
 		return nil, err
 	}
 
-	// verify connection
-	if err := pool.Ping(ctx); err != nil {
-		return nil, err
-	}
-
-	return pool, nil
+	return conn, err
 }

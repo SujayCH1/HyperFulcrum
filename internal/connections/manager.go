@@ -13,8 +13,11 @@ type ConnectionManager struct {
 }
 
 func NewConnectionManager(
-	store *ConnectionStore, projectRepo *repository.ProjectRepository,
-	nodeRepo *repository.NodeRepository, nodeConnRepo *repository.NodeConnectionRepository) *ConnectionManager {
+	store *ConnectionStore,
+	projectRepo *repository.ProjectRepository,
+	nodeRepo *repository.NodeRepository,
+	nodeConnRepo *repository.NodeConnectionRepository,
+) *ConnectionManager {
 	return &ConnectionManager{
 		store:        store,
 		projectRepo:  projectRepo,

@@ -35,7 +35,7 @@ func (f *Fetcher) RefreshProject(ctx context.Context, projectID string) error {
 	}
 	f.cache.Projects.Set(projectID, *project)
 
-	nodes, err := f.nodesRepo.NodeGetByPorjectID(ctx, projectID) //GetNodesByProjectID
+	nodes, err := f.nodesRepo.NodesGetByPorjectID(ctx, projectID) //GetNodesByProjectID
 	if err != nil {
 		return fmt.Errorf("fetch nodes for project %s: %w", projectID, err)
 	}
@@ -46,7 +46,7 @@ func (f *Fetcher) RefreshProject(ctx context.Context, projectID string) error {
 		if err != nil {
 			return fmt.Errorf("fetch connections for node %s: %w", node.ID, err)
 		}
-		f.cache.Connections.Set(node.ID, connections)
+		f.cache.Connections.Set(node.ID, *connections)
 	}
 
 	return nil
@@ -86,7 +86,7 @@ func (f *Fetcher) GetNodes(ctx context.Context, projectID string) ([]repository.
 	return nodes, nil
 }
 
-func (f *Fetcher) GetConnections(ctx context.Context, nodeID string) ([]repository.NodeConnection, error) {
+func (f *Fetcher) GetConnections(ctx context.Context, nodeID string) (repository.NodeConnection, error) {
 	if connections, ok := f.cache.Connections.Get(nodeID); ok {
 		return connections, nil
 	}
@@ -94,9 +94,9 @@ func (f *Fetcher) GetConnections(ctx context.Context, nodeID string) ([]reposito
 	// load directly for this node if missing
 	connections, err := f.nodesConnRepo.GetConnectionByNodeId(ctx, nodeID)
 	if err != nil {
-		return nil, fmt.Errorf("fetch connections for node %s: %w", nodeID, err)
+		return repository.NodeConnection{}, fmt.Errorf("fetch connections for node %s: %w", nodeID, err)
 	}
 
-	f.cache.Connections.Set(nodeID, connections)
-	return connections, nil
+	f.cache.Connections.Set(nodeID, *connections)
+	return *connections, nil
 }
