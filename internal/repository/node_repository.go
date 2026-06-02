@@ -213,7 +213,7 @@ func (r *NodeRepository) NodeUpdateType(ctx context.Context, nodeID string, node
 	return nil
 }
 
-func (r *NodeRepository) NodeGetByPorjectID(ctx context.Context, projectID string) (Node, error) {
+func (r *NodeRepository) NodesGetByPorjectID(ctx context.Context, projectID string) ([]Node, error) {
 
 	query := `
 		SELECT 
@@ -222,28 +222,36 @@ func (r *NodeRepository) NodeGetByPorjectID(ctx context.Context, projectID strin
 		WHERE project_id = $1
 	`
 
-	row := r.conn.QueryRowContext(
+	rows, err := r.conn.QueryContext(
 		ctx,
 		query,
 		projectID,
 	)
-
-	var node Node
-
-	err := row.Scan(
-		&node.ID,
-		&node.ProjectID,
-		&node.Name,
-		&node.Index,
-		&node.Status,
-		&node.Type,
-		&node.CreatedAt,
-	)
 	if err != nil {
-		return Node{}, err
+		return []Node{}, err
 	}
 
-	return node, nil
+	var nodes []Node
+	var node Node
+
+	for rows.Next() {
+		err := rows.Scan(
+			&node.ID,
+			&node.ProjectID,
+			&node.Name,
+			&node.Index,
+			&node.Status,
+			&node.Type,
+			&node.CreatedAt,
+		)
+		if err != nil {
+			return []Node{}, err
+		}
+
+		nodes = append(nodes, node)
+	}
+
+	return nodes, nil
 
 }
 

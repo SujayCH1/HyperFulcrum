@@ -35,7 +35,7 @@ func (f *Fetcher) RefreshProject(ctx context.Context, projectID string) error {
 	}
 	f.cache.Projects.Set(projectID, *project)
 
-	nodes, err := f.nodesRepo.(projectID) //GetNodesByProjectID
+	nodes, err := f.nodesRepo.NodeGetByPorjectID(ctx, projectID) //GetNodesByProjectID
 	if err != nil {
 		return fmt.Errorf("fetch nodes for project %s: %w", projectID, err)
 	}
