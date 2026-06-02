@@ -5,7 +5,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
 
+	"hyperfulcrum/internal/api/router"
 	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/connections"
 	"hyperfulcrum/internal/database"
@@ -31,6 +33,9 @@ type Application struct {
 	// cache
 	CacheManager *cache.CacheManager
 	CacheFetcher *cache.Fetcher
+
+	// api
+	Server *http.ServeMux
 }
 
 func New(ctx context.Context) (*Application, error) {
@@ -92,6 +97,15 @@ func (a *Application) Start(ctx context.Context) error {
 	)
 
 	logger.Logger.Info("Connection manager initialized")
+
+	//API Server
+	logger.Logger.Info("Initializing application server")
+
+	a.Server = router.NewRouter()
+
+	logger.Logger.Info("Appllication server initialized")
+
+	// application setup complete
 
 	logger.Logger.Info("HyperFulcrum application started successfully")
 
