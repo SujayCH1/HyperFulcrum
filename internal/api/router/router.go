@@ -6,12 +6,13 @@ import (
 	"net/http"
 )
 
-func NewRouter(projectService *services.ProjectService,nodeService *services.NodeService) *http.ServeMux {
+func NewRouter(projectService *services.ProjectService, nodeService *services.NodeService) *http.ServeMux {
 
 	mux := http.NewServeMux()
 
 	projectValidator := middleware.ProjectValidator
 	nodeValidator := middleware.NodeValidator
+	// nodeConnectionValidator := middleware.NodeConnectionValidator
 
 	//Project routes
 	mux.HandleFunc("GET /projects/", projectService.ListProjects)
