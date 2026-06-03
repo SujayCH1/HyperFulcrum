@@ -9,12 +9,13 @@ import (
 
 type contextKey string
 
-const (projectPayloadKey contextKey = "projectPayload")
-
+const (
+	projectPayloadKey contextKey = "projectPayload"
+)
 
 func ProjectValidator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var payload dto.CreateProjectDto
+		var payload dto.ProjectDto
 
 		if err := utils.ReadJSONRequest(r, &payload); err != nil {
 			utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Invalid request body", err)
@@ -31,8 +32,7 @@ func ProjectValidator(next http.Handler) http.Handler {
 	})
 }
 
-
-func GetProjectPayload(r *http.Request) (dto.CreateProjectDto, bool) {
-	payload, ok := r.Context().Value(projectPayloadKey).(dto.CreateProjectDto)
+func GetProjectPayload(r *http.Request) (dto.ProjectDto, bool) {
+	payload, ok := r.Context().Value(projectPayloadKey).(dto.ProjectDto)
 	return payload, ok
 }
