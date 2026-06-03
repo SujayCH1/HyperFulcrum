@@ -36,10 +36,12 @@ func WriteJSONSuccessResponse(w http.ResponseWriter,status int,message string,da
 
 func WriteJSONErrorResponse(w http.ResponseWriter,status int,message string,err error) error {
 
-	response := ErrorResponse{Success: false, Message: message, Error: err.Error()}
+	var errStr string
 	if err != nil {
-		response.Error = err.Error()
+		errStr = err.Error()
 	}
+
+	response := ErrorResponse{Success: false, Message: message, Error: errStr}
 
 	return WriteJSONResponse(w,status,response)
 }
