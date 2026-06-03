@@ -7,15 +7,13 @@ import (
 	"net/http"
 )
 
-type contextKey string
+type nodeContextKey string
+const nodePayloadKey nodeContextKey = "nodePayload"
 
-const (projectPayloadKey contextKey = "projectPayload")
-
-
-func ProjectValidator(next http.Handler) http.Handler {
+func NodeValidator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var payload dto.CreateProjectDto
 
+		var payload dto.CreateNodeDto
 		if err := utils.ReadJSONRequest(r, &payload); err != nil {
 			utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Invalid request body", err)
 			return
@@ -26,13 +24,12 @@ func ProjectValidator(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), projectPayloadKey, payload)
+		ctx := context.WithValue(r.Context(), nodePayloadKey, payload)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-
-func GetProjectPayload(r *http.Request) (dto.CreateProjectDto, bool) {
-	payload, ok := r.Context().Value(projectPayloadKey).(dto.CreateProjectDto)
+func GetNodePayload(r *http.Request) (dto.CreateNodeDto, bool) {
+	payload, ok := r.Context().Value(nodePayloadKey).(dto.CreateNodeDto)
 	return payload, ok
 }
