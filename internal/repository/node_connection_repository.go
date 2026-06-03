@@ -26,7 +26,7 @@ func NewNodeConnectionRepository(connConfig *sql.DB) *NodeConnectionRepository {
 	return &NodeConnectionRepository{conn: connConfig}
 }
 
-func (r *NodeConnectionRepository) ConnectionCreate(ctx context.Context, node_conn *NodeConnection) error {
+func (r *NodeConnectionRepository) ConnectionAdd(ctx context.Context, node_conn *NodeConnection) error {
 
 	query := `INSERT INTO node_connections (node_id,host,port,database_name,username,password) VALUES ($1,$2,$3,$4,$5,$6)`
 	_, err := r.conn.ExecContext(ctx, query, node_conn.NodeId, node_conn.Host, node_conn.Port, node_conn.DatabaseName, node_conn.Username, node_conn.Password)

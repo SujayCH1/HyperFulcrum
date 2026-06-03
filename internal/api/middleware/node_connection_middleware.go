@@ -7,14 +7,16 @@ import (
 	"net/http"
 )
 
-type nodeContextKey string
+type contextey string
 
-const nodePayloadKey nodeContextKey = "nodePayload"
+const (
+	nodeConnectionPayloadkey contextey = "nodeConnectionPayload"
+)
 
-func NodeValidator(next http.Handler) http.Handler {
+func NodeConnectionValidator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload dto.NodeConnectionDto
 
-		var payload dto.NodeDto
 		if err := utils.ReadJSONRequest(r, &payload); err != nil {
 			utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Invalid request body", err)
 			return
@@ -25,12 +27,12 @@ func NodeValidator(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), nodePayloadKey, payload)
+		ctx := context.WithValue(r.Context(), projectPayloadKey, payload)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-func GetNodePayload(r *http.Request) (dto.NodeDto, bool) {
-	payload, ok := r.Context().Value(nodePayloadKey).(dto.NodeDto)
+func GetNodeConnectionPayload(r *http.Request) (dto.NodeConnectionDto, bool) {
+	payload, ok := r.Context().Value(nodeConnectionPayloadkey).(dto.NodeConnectionDto)
 	return payload, ok
 }
