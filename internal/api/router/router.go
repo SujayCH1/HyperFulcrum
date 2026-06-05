@@ -6,13 +6,13 @@ import (
 	"net/http"
 )
 
-func NewRouter(projectService *services.ProjectService, nodeService *services.NodeService) *http.ServeMux {
+func NewRouter(projectService *services.ProjectService, nodeService *services.NodeService, nodeConnectionService *services.NodeConnectionService) *http.ServeMux {
 
 	mux := http.NewServeMux()
 
 	projectValidator := middleware.ProjectValidator
 	nodeValidator := middleware.NodeValidator
-	// nodeConnectionValidator := middleware.NodeConnectionValidator
+	nodeConnectionValidator := middleware.NodeConnectionValidator
 
 	//Project routes
 	mux.HandleFunc("GET /projects/", projectService.ListProjects)
@@ -28,6 +28,12 @@ func NewRouter(projectService *services.ProjectService, nodeService *services.No
 	mux.HandleFunc("PUT /nodes/{id}/name", nodeService.UpdateNodeName)
 	mux.HandleFunc("PATCH /nodes/{id}/status", nodeService.UpdateNodeStatus)
 	mux.HandleFunc("PATCH /nodes/{id}/type", nodeService.UpdateNodeType)
+
+	// node connection routes
+	mux.Handle("POST /nodes/{nodeId}/connection", nodeConnectionValidator(http.HandlerFunc(nodeConnectionService.AddNodeConnection)))
+	mux.HandleFunc("DELETE /nodes/{nodeId}/connection", nodeConnectionService.RemoveNodeConnection)
+	mux.HandleFunc("PATCH /nodes/{nodeId}/connection", nodeConnectionService.UpdateNodeConnection)
+	mux.HandleFunc("GET /nodes/{nodeId}/connectio", nodeConnectionService.GetNodeConnectionByID)
 
 	//http://localhost:8080/nodes/c5f8bcd2-a2b6-4416-9001-699ea1621538/name?name=nodee-1
 	return mux
