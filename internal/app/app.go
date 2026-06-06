@@ -13,6 +13,7 @@ import (
 	"hyperfulcrum/internal/repository"
 	"hyperfulcrum/pkg/logger"
 	"net/http"
+	"hyperfulcrum/internal/api/middleware"
 )
 
 type Application struct {
@@ -112,11 +113,13 @@ func (a *Application) Start(ctx context.Context) error {
 	//server setup
 	a.Server = router.NewRouter(a.ProjectService, a.NodeService)
 
+	handler := middleware.CORS(a.Server)
+
 	logger.Logger.Info("Application server initialized")
 
 	go func() {
 		logger.Logger.Info("Starting HTTP server on :8080")
-		if err := http.ListenAndServe(":8080", a.Server); err != nil && err != http.ErrServerClosed {
+		if err := http.ListenAndServe(":8080", handler); err != nil && err != http.ErrServerClosed {
 			logger.Logger.Error("HTTP server failed", "error", err)
 		}
 	}()

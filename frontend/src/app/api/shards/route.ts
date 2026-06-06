@@ -1,18 +1,24 @@
-import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+// // app/api/shards/route.ts
+// // Go wraps: { success, message, data: Node[] }
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const projectId = searchParams.get("project_id");
-  if (!projectId) return NextResponse.json({ error: "project_id required" }, { status: 400 });
-  try {
-    const { rows } = await pool.query(
-      "SELECT * FROM shards WHERE project_id=$1 ORDER BY created_at ASC",
-      [projectId]
-    );
-    return NextResponse.json(rows);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Failed to fetch shards" }, { status: 500 });
-  }
-}
+// const GO_API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+// export async function GET(request: Request) {
+//   const { searchParams } = new URL(request.url);
+//   const projectId = searchParams.get("project_id");
+
+//   if (!projectId) {
+//     return Response.json({ error: "project_id required" }, { status: 400 });
+//   }
+
+//   try {
+//     const res = await fetch(`${GO_API}/projects/${projectId}/nodes`);
+//     const json = await res.json();
+//     if (!res.ok) return Response.json({ error: json.message }, { status: res.status });
+//     // Unwrap Go's { success, message, data: Node[] }
+//     return Response.json(json.data ?? []);
+//   } catch (err) {
+//     console.error(err);
+//     return Response.json({ error: "Failed to fetch nodes" }, { status: 500 });
+//   }
+// }

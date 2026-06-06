@@ -12,8 +12,8 @@ type NodeDto struct {
 func (dto *NodeDto) Validate() error {
 	return validation.ValidateStruct(dto,
 		validation.Field(&dto.Name, validation.Required, validation.Length(3, 100)),
-		validation.Field(&dto.Index, validation.Required),
-		validation.Field(&dto.Status, validation.Required),
+		validation.Field(&dto.Index, validation.Skip),
+		validation.Field(&dto.Status, validation.Skip),
 		validation.Field(&dto.Type, validation.Required, validation.In("shard", "replica")),
 	)
 }
