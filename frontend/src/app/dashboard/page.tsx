@@ -10,7 +10,9 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
-import type { Project, Shard, Log } from "@/types";
+import type { Project, Node, Log } from "@/types";
+
+
 
 /* ─── Tux SVG ─────────────────────────────────────────────────────────── */
 function TuxIcon({ size = 20 }: { size?: number }) {
@@ -141,28 +143,42 @@ function WalkthroughOverlay({ onFinish }: { onFinish: () => void }) {
 
 /* ─── Project Wizard ─────────────────────────────────────────────────── */
 function ProjectWizard({ project, onComplete }: { project: Project; onComplete: () => void }) {
-  const [step, setStep]           = useState(1);
-  const [schemaSql, setSchemaSql] = useState(DEFAULT_SCHEMA);
-  const [shardCount, setShardCount] = useState(3);
-  const [saving, setSaving]       = useState(false);
-  const [deploying, setDeploying] = useState(false);
+  const [step, setStep]             = useState(1);
+  const [schemaSql, setSchemaSql]   = useState(DEFAULT_SCHEMA);
+  const [nodeCount, setNodeCount]   = useState(3);
+  const [saving, setSaving]         = useState(false);
+  const [deploying, setDeploying]   = useState(false);
 
-  const { updateProjectSchema, deployShards } = useProjectStore();
+  // updateProjectSchema is now a local state update (no network call)
+  // addNode calls Go POST /projects/:id/nodes
+  const { updateProjectSchema, addNode } = useProjectStore();
 
   const handleSaveSchema = async () => {
     setSaving(true);
-    const ok = await updateProjectSchema(project.id, schemaSql);
+    // Local-only update — no network call, just saves to Zustand
+    updateProjectSchema(project.id, schemaSql);
     setSaving(false);
-    if (ok) setStep(2);
-    else toast.error("Failed to save schema");
+    setStep(2);
   };
 
   const handleDeploy = async () => {
     setDeploying(true);
-    const ok = await deployShards(project.id, shardCount);
+    let allOk = true;
+    for (let i = 0; i < nodeCount; i++) {
+      const nodeName = `shard_${String.fromCharCode(97 + i)}`;
+      const ok = await addNode(project.id, {
+        node_name: nodeName,
+        host: `node-${String(i + 1).padStart(2, "0")}.local`,
+        port: 5432,
+        database_name: project.name.toLowerCase().replace(/\s+/g, "_"),
+        username: "postgres",
+        password: "postgres",
+      });
+      if (!ok) { allOk = false; break; }
+    }
     setDeploying(false);
-    if (ok) { toast.success(`${shardCount} shard nodes deployed`); onComplete(); }
-    else toast.error("Deployment failed");
+    if (allOk) { toast.success(`${nodeCount} shard nodes deployed`); onComplete(); }
+    else toast.error("Deployment failed — check Go backend logs");
   };
 
   const stepDone = step > 1;
@@ -245,12 +261,12 @@ function ProjectWizard({ project, onComplete }: { project: Project; onComplete: 
 
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-3">
-                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.18em]">Shard Count</label>
-                  <span className="text-2xl font-bold text-white font-mono">{shardCount}</span>
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.18em]">Node Count</label>
+                  <span className="text-2xl font-bold text-white font-mono">{nodeCount}</span>
                 </div>
                 <input
-                  type="range" min={1} max={16} value={shardCount}
-                  onChange={(e) => setShardCount(Number(e.target.value))}
+                  type="range" min={1} max={16} value={nodeCount}
+                  onChange={(e) => setNodeCount(Number(e.target.value))}
                   className="w-full accent-blue-500"
                 />
                 <div className="flex justify-between text-[10px] font-mono text-zinc-700 mt-1">
@@ -258,9 +274,9 @@ function ProjectWizard({ project, onComplete }: { project: Project; onComplete: 
                 </div>
               </div>
 
-              {/* Shard preview grid */}
-              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(shardCount, 4)}, 1fr)` }}>
-                {Array.from({ length: shardCount }, (_, i) => (
+              {/* Node preview grid */}
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(nodeCount, 4)}, 1fr)` }}>
+                {Array.from({ length: nodeCount }, (_, i) => (
                   <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-center">
                     <div className="w-2 h-2 rounded-full bg-blue-500 mx-auto mb-2" />
                     <div className="text-[9px] font-mono text-zinc-500">shard_{String.fromCharCode(97 + i)}</div>
@@ -282,7 +298,7 @@ function ProjectWizard({ project, onComplete }: { project: Project; onComplete: 
               >
                 {deploying
                   ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Deploying...</>
-                  : <><Layers size={14} />Deploy {shardCount} Shards</>}
+                  : <><Layers size={14} />Deploy {nodeCount} Nodes</>}
               </button>
             </div>
           </div>
@@ -303,20 +319,19 @@ function StatCard({ label, value, sub, color = "#10b981" }: { label: string; val
   );
 }
 
-/* ─── Shard Row ──────────────────────────────────────────────────────── */
-function ShardRow({ shard, onExecute }: { shard: Shard; onExecute: (id: number) => void }) {
-  const [busy, setBusy]       = useState(false);
+/* ─── Node Row (was ShardRow) ────────────────────────────────────────── */
+function NodeRow({ node, onExecute }: { node: Node; onExecute: (id: string) => void }) {
+  const [busy, setBusy]         = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const handleExec = async () => {
     setBusy(true);
-    await onExecute(shard.id);
+    await onExecute(node.id);
     setBusy(false);
   };
 
-  const statusColor = shard.status === "active"   ? "#34d399"
-                    : shard.status === "error"    ? "#f87171"
-                    : "#71717a";
+  // node_status is boolean: true = active/applied, false = inactive
+  const statusColor = node.node_status ? "#34d399" : "#71717a";
 
   return (
     <div className="border border-zinc-800 rounded-xl overflow-hidden" style={{ background: "rgba(9,9,9,0.6)" }}>
@@ -326,29 +341,38 @@ function ShardRow({ shard, onExecute }: { shard: Shard; onExecute: (id: number) 
         </div>
         <TuxIcon size={16} />
         <div className="flex-1 min-w-0">
-          <div className="text-zinc-200 font-mono text-sm font-semibold">{shard.shard_key}</div>
-          <div className="text-zinc-600 text-[10px] font-mono">{shard.node_host}</div>
+          <div className="text-zinc-200 font-mono text-sm font-semibold">{node.node_name}</div>
+          {/* node_type shown as a badge instead of node_host */}
+          <div className="text-zinc-600 text-[10px] font-mono">{node.node_type ?? "primary"}</div>
         </div>
         <div className="hidden sm:flex items-center gap-4 text-[10px] font-mono text-zinc-600">
-          <span>load: {shard.metrics_load}%</span>
-          {shard.schema_applied && <span className="text-emerald-500 flex items-center gap-1"><CheckCircle2 size={10} />schema</span>}
+          {node.node_status && (
+            <span className="text-emerald-500 flex items-center gap-1">
+              <CheckCircle2 size={10} />active
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={handleExec}
-            disabled={busy || shard.schema_applied}
+            disabled={busy || node.node_status}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[11px] font-semibold transition-all"
             style={{
-              background: shard.schema_applied ? "transparent" : "rgba(16,185,129,0.1)",
-              border: shard.schema_applied ? "1px solid #27272a" : "1px solid rgba(16,185,129,0.25)",
-              color: shard.schema_applied ? "#3f3f46" : "#34d399",
-              cursor: shard.schema_applied ? "not-allowed" : "pointer",
+              background: node.node_status ? "transparent" : "rgba(16,185,129,0.1)",
+              border: node.node_status ? "1px solid #27272a" : "1px solid rgba(16,185,129,0.25)",
+              color: node.node_status ? "#3f3f46" : "#34d399",
+              cursor: node.node_status ? "not-allowed" : "pointer",
             }}
           >
-            {busy ? <span className="w-3 h-3 border border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" /> : <Play size={10} />}
-            {shard.schema_applied ? "Applied" : "Execute"}
+            {busy
+              ? <span className="w-3 h-3 border border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+              : <Play size={10} />}
+            {node.node_status ? "Active" : "Activate"}
           </button>
-          <button onClick={() => setExpanded((x) => !x)} className="w-7 h-7 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-all">
+          <button
+            onClick={() => setExpanded((x) => !x)}
+            className="w-7 h-7 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-all"
+          >
             {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
         </div>
@@ -356,9 +380,10 @@ function ShardRow({ shard, onExecute }: { shard: Shard; onExecute: (id: number) 
 
       {expanded && (
         <div className="px-5 pb-4 pt-0 border-t border-zinc-900 text-[11px] font-mono text-zinc-600 space-y-1">
-          <div>ID: {shard.id}</div>
-          <div>Created: {new Date(shard.created_at).toLocaleString()}</div>
-          {shard.last_executed_at && <div>Last exec: {new Date(shard.last_executed_at).toLocaleString()}</div>}
+          <div>ID: {node.id}</div>
+          <div>Index: {node.node_index}</div>
+          <div>Type: {node.node_type ?? "primary"}</div>
+          <div>Created: {new Date(node.created_at).toLocaleString()}</div>
         </div>
       )}
     </div>
@@ -390,10 +415,11 @@ export default function DashboardPage() {
   const firstTime   = searchParams?.get("firstTime") === "true";
 
   const {
-    projects, activeProject, shards, logs,
+    projects, activeProject, nodes, logs,
     loadingShards, loadingLogs, error,
     fetchProjects, setActiveProject,
-    fetchShards, fetchLogs, executeShard,
+    fetchNodes, addLog,
+    updateNodeStatus,
     activeTab, setActiveTab,
   } = useProjectStore();
 
@@ -411,42 +437,45 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!mounted || !projects.length) return;
-    const target = projects.find((p) => String(p.id) === projectId) ?? projects[0];
+    const target = projects.find((p) => p.id === projectId) ?? projects[0];
     if (target) setActiveProject(target);
   }, [mounted, projects, projectId, setActiveProject]);
 
   useEffect(() => {
     if (!activeProject) return;
-    fetchShards(activeProject.id);
-    fetchLogs(activeProject.id);
-  }, [activeProject, fetchShards, fetchLogs]);
+    fetchNodes(activeProject.id);
+  }, [activeProject, fetchNodes]);
 
   useEffect(() => {
     if (activeTab === "logs") logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs, activeTab]);
 
-  const handleExecuteShard = useCallback(async (shardId: number) => {
-    const ok = await executeShard(shardId);
-    if (ok) { toast.success("Schema applied to shard"); fetchLogs(activeProject!.id); }
-    else toast.error("Execution failed");
-  }, [executeShard, activeProject, fetchLogs]);
+  // Execute = activate a node via Go PATCH /nodes/:id/status?status=true
+  const handleExecuteNode = useCallback(async (nodeId: string) => {
+    const ok = await updateNodeStatus(nodeId, true);
+    if (ok) {
+      toast.success("Node activated");
+      addLog(`Node ${nodeId} activated`, "info");
+    } else {
+      toast.error("Activation failed");
+    }
+  }, [updateNodeStatus, addLog]);
 
   const handleWizardComplete = useCallback(() => {
     setShowWizard(false);
-    if (activeProject) {
-      fetchShards(activeProject.id);
-      fetchLogs(activeProject.id);
-    }
-  }, [activeProject, fetchShards, fetchLogs]);
+    if (activeProject) fetchNodes(activeProject.id);
+  }, [activeProject, fetchNodes]);
 
   if (!mounted) return null;
 
-  const activeShards  = shards.filter((s) => s.status === "active").length;
-  const appliedShards = shards.filter((s) => s.schema_applied).length;
+  // node_status === true means active/online
+  const activeNodes  = nodes.filter((n) => n.node_status).length;
+  // Use activeNodes as proxy for "applied" since node_status covers both
+  const appliedNodes = activeNodes;
 
   const tabs = [
     { id: "schema" as const,  label: "Schema",  Icon: Code2 },
-    { id: "shards" as const,  label: "Shards",  Icon: Server },
+    { id: "shards" as const,  label: "Nodes",   Icon: Server },
     { id: "logs"   as const,  label: "Logs",    Icon: TermIcon },
   ];
 
@@ -482,7 +511,7 @@ export default function DashboardPage() {
             </div>
           )}
           <button
-            onClick={() => activeProject && fetchShards(activeProject.id)}
+            onClick={() => activeProject && fetchNodes(activeProject.id)}
             className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:border-zinc-700 transition-all"
           >
             <RefreshCw size={13} />
@@ -504,12 +533,18 @@ export default function DashboardPage() {
                   key={p.id}
                   onClick={() => setActiveProject(p)}
                   className="w-full text-left px-4 py-3 flex items-center gap-3 transition-all group"
-                  style={{ background: isActive ? "rgba(16,185,129,0.06)" : "transparent", borderLeft: isActive ? "2px solid #10b981" : "2px solid transparent" }}
+                  style={{
+                    background: isActive ? "rgba(16,185,129,0.06)" : "transparent",
+                    borderLeft: isActive ? "2px solid #10b981" : "2px solid transparent",
+                  }}
                 >
                   <Database size={13} className={isActive ? "text-emerald-400" : "text-zinc-600"} />
                   <div className="min-w-0 flex-1">
-                    <div className={`font-mono text-xs truncate font-semibold ${isActive ? "text-zinc-100" : "text-zinc-400 group-hover:text-zinc-300"}`}>{p.name}</div>
-                    <div className="text-zinc-700 text-[10px] font-mono">{p.shard_count ?? 0} shards</div>
+                    <div className={`font-mono text-xs truncate font-semibold ${isActive ? "text-zinc-100" : "text-zinc-400 group-hover:text-zinc-300"}`}>
+                      {p.name}
+                    </div>
+                    {/* node_count from Go's project shape */}
+                    <div className="text-zinc-700 text-[10px] font-mono">{p.node_count ?? 0} nodes</div>
                   </div>
                 </button>
               );
@@ -526,13 +561,16 @@ export default function DashboardPage() {
                 <div>
                   <div className="flex items-center gap-3 mb-1">
                     <h1 className="text-lg font-bold text-white font-mono">{activeProject.name}</h1>
-                    <span className="text-[9px] font-mono px-2 py-0.5 rounded"
+                    {/* Go uses ready: boolean and running: boolean instead of status string */}
+                    <span
+                      className="text-[9px] font-mono px-2 py-0.5 rounded"
                       style={{
-                        color: activeProject.status === "active" ? "#34d399" : "#71717a",
-                        background: activeProject.status === "active" ? "rgba(16,185,129,0.08)" : "#18181b",
-                        border: `1px solid ${activeProject.status === "active" ? "rgba(16,185,129,0.2)" : "#27272a"}`,
-                      }}>
-                      {activeProject.status}
+                        color: activeProject.ready ? "#34d399" : "#71717a",
+                        background: activeProject.ready ? "rgba(16,185,129,0.08)" : "#18181b",
+                        border: `1px solid ${activeProject.ready ? "rgba(16,185,129,0.2)" : "#27272a"}`,
+                      }}
+                    >
+                      {activeProject.running ? "running" : activeProject.ready ? "ready" : "idle"}
                     </span>
                   </div>
                   {activeProject.description && (
@@ -549,10 +587,10 @@ export default function DashboardPage() {
 
               {/* Stats row */}
               <div className="px-7 py-4 grid grid-cols-4 gap-4 border-b border-zinc-900 flex-shrink-0">
-                <StatCard label="Shards"    value={shards.length}           sub="provisioned"     />
-                <StatCard label="Active"    value={activeShards}            sub="nodes online"    color="#34d399" />
-                <StatCard label="Applied"   value={appliedShards}           sub="schema pushed"   color="#3b82f6" />
-                <StatCard label="Logs"      value={logs.length}             sub="entries"         color="#a78bfa" />
+                <StatCard label="Nodes"    value={nodes.length}   sub="provisioned"   />
+                <StatCard label="Active"   value={activeNodes}    sub="nodes online"  color="#34d399" />
+                <StatCard label="Applied"  value={appliedNodes}   sub="schema pushed" color="#3b82f6" />
+                <StatCard label="Logs"     value={logs.length}    sub="entries"       color="#a78bfa" />
               </div>
 
               {/* Tabs */}
@@ -579,6 +617,7 @@ export default function DashboardPage() {
 
               {/* Tab panels */}
               <div className="flex-1 overflow-y-auto p-7">
+
                 {/* Schema tab */}
                 {activeTab === "schema" && (
                   <div className="animate-fade-up">
@@ -588,7 +627,10 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-2 text-zinc-400 font-mono text-xs">
                             <Code2 size={12} /><span>schema.sql</span>
                           </div>
-                          <button onClick={() => setShowWizard(true)} className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-600 hover:text-zinc-300 transition-colors">
+                          <button
+                            onClick={() => setShowWizard(true)}
+                            className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-600 hover:text-zinc-300 transition-colors"
+                          >
                             <Save size={10} />Edit
                           </button>
                         </div>
@@ -600,8 +642,11 @@ export default function DashboardPage() {
                       <div className="flex flex-col items-center justify-center py-20 text-center">
                         <Code2 size={32} className="text-zinc-800 mb-4" />
                         <p className="text-zinc-600 font-mono text-sm mb-4">No schema defined yet</p>
-                        <button onClick={() => setShowWizard(true)} className="px-5 py-2.5 rounded-lg font-mono text-sm font-semibold text-white transition-all"
-                          style={{ background: "#059669", boxShadow: "0 4px 16px rgba(16,185,129,0.2)" }}>
+                        <button
+                          onClick={() => setShowWizard(true)}
+                          className="px-5 py-2.5 rounded-lg font-mono text-sm font-semibold text-white transition-all"
+                          style={{ background: "#059669", boxShadow: "0 4px 16px rgba(16,185,129,0.2)" }}
+                        >
                           Open Wizard
                         </button>
                       </div>
@@ -609,25 +654,29 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Shards tab */}
+                {/* Nodes tab (was Shards) */}
                 {activeTab === "shards" && (
                   <div className="space-y-3 animate-fade-up">
                     {loadingShards ? (
                       <div className="flex items-center gap-2 text-zinc-600 font-mono text-sm py-8 justify-center">
-                        <span className="w-4 h-4 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />Loading shards...
+                        <span className="w-4 h-4 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
+                        Loading nodes...
                       </div>
-                    ) : shards.length === 0 ? (
+                    ) : nodes.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-20 text-center">
                         <Server size={32} className="text-zinc-800 mb-4" />
                         <p className="text-zinc-600 font-mono text-sm mb-4">No shard nodes provisioned</p>
-                        <button onClick={() => setShowWizard(true)} className="px-5 py-2.5 rounded-lg font-mono text-sm font-semibold text-white transition-all"
-                          style={{ background: "#2563eb", boxShadow: "0 4px 16px rgba(59,130,246,0.2)" }}>
-                          Deploy Shards
+                        <button
+                          onClick={() => setShowWizard(true)}
+                          className="px-5 py-2.5 rounded-lg font-mono text-sm font-semibold text-white transition-all"
+                          style={{ background: "#2563eb", boxShadow: "0 4px 16px rgba(59,130,246,0.2)" }}
+                        >
+                          Deploy Nodes
                         </button>
                       </div>
                     ) : (
-                      shards.map((s) => (
-                        <ShardRow key={s.id} shard={s} onExecute={handleExecuteShard} />
+                      nodes.map((n) => (
+                        <NodeRow key={n.id} node={n} onExecute={handleExecuteNode} />
                       ))
                     )}
                   </div>
@@ -640,15 +689,11 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs">
                         <TermIcon size={12} /><span>orchestration.log</span>
                       </div>
-                      <button onClick={() => fetchLogs(activeProject.id)} className="text-[10px] font-mono text-zinc-600 hover:text-zinc-300 transition-colors flex items-center gap-1">
-                        <RefreshCw size={10} />Refresh
-                      </button>
+                      {/* Logs are in-memory — no refresh fetch needed */}
                     </div>
                     <div className="px-5 py-4 min-h-[300px] max-h-[500px] overflow-y-auto">
-                      {loadingLogs ? (
-                        <div className="text-zinc-700 font-mono text-xs py-4 text-center">Loading logs...</div>
-                      ) : logs.length === 0 ? (
-                        <div className="text-zinc-700 font-mono text-xs py-8 text-center">No logs yet</div>
+                      {logs.length === 0 ? (
+                        <div className="text-zinc-700 font-mono text-xs py-8 text-center">No logs yet — activate a node to see entries</div>
                       ) : (
                         <>
                           {[...logs].reverse().map((l) => <LogLine key={l.id} log={l} />)}
@@ -658,6 +703,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 )}
+
               </div>
             </>
           ) : (
