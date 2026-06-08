@@ -5,11 +5,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"hyperfulcrum/internal/api/handlers"
 	"hyperfulcrum/internal/api/router"
-	"hyperfulcrum/internal/api/services"
 	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/connections"
 	"hyperfulcrum/internal/database"
+	"hyperfulcrum/internal/metadata"
 	"hyperfulcrum/internal/repository"
 	"hyperfulcrum/pkg/logger"
 	"net/http"
@@ -26,9 +27,15 @@ type Application struct {
 	NodeRepo     *repository.NodeRepository
 	NodeConnRepo *repository.NodeConnectionRepository
 
-	// api services
-	ProjectService *services.ProjectService
-	NodeService    *services.NodeService
+	// metadata services
+	ProjectService        *metadata.ProjectService
+	NodeService           *metadata.NodeService
+	NodeConnectionService *metadata.NodeConnectionService
+
+	// handlers
+	ProjectHandler        *handlers.ProjectHandler
+	NodeHandler           *handlers.NodeHandler
+	NodeConnectionHandler *handlers.NodeConnectionHandler
 
 	// connection pool
 	ConnectionStore   *connections.ConnectionStore
@@ -105,12 +112,38 @@ func (a *Application) Start(ctx context.Context) error {
 	//API Server
 	logger.Logger.Info("Initializing application server")
 
-	//api services
-	a.ProjectService = services.NewProjectService(a.ProjectRepo)
-	a.NodeService = services.NewNodeService(a.NodeRepo)
+	// metadata services
+	a.ProjectService = metadata.NewProjectService(
+		a.ProjectRepo,
+	)
 
-	//server setup
-	a.Server = router.NewRouter(a.ProjectService, a.NodeService)
+	a.NodeService = metadata.NewNodeService(
+		a.NodeRepo,
+	)
+
+	a.NodeConnectionService = metadata.NewNodeConnectionService(
+		a.NodeConnRepo,
+	)
+
+	// handlers
+	a.ProjectHandler = handlers.NewProjectHandler(
+		a.ProjectService,
+	)
+
+	a.NodeHandler = handlers.NewNodeHandler(
+		a.NodeService,
+	)
+
+	a.NodeConnectionHandler = handlers.NewNodeConnectionHandler(
+		a.NodeConnectionService,
+	)
+
+	// server setup
+	a.Server = router.NewRouter(
+		a.ProjectHandler,
+		a.NodeHandler,
+		a.NodeConnectionHandler,
+	)
 
 	logger.Logger.Info("Application server initialized")
 

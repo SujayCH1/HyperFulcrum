@@ -76,7 +76,7 @@ func (r *NodeConnectionRepository) ConnectionUpdate(ctx context.Context, nodeCon
 	return nil
 }
 
-func (r *NodeConnectionRepository) GetConnectionByNodeId(ctx context.Context, nodeId string) (*NodeConnection, error) {
+func (r *NodeConnectionRepository) GetConnectionByNodeId(ctx context.Context, nodeId string) (NodeConnection, error) {
 
 	query := `SELECT node_id, host, port, database_name, username, password, created_at, updated_at FROM node_connections WHERE node_id = $1`
 	row := r.conn.QueryRowContext(ctx, query, nodeId)
@@ -84,8 +84,8 @@ func (r *NodeConnectionRepository) GetConnectionByNodeId(ctx context.Context, no
 	var nodeConn NodeConnection
 	err := row.Scan(&nodeConn.NodeId, &nodeConn.Host, &nodeConn.Port, &nodeConn.DatabaseName, &nodeConn.Username, &nodeConn.Password, &nodeConn.CreatedAt, &nodeConn.UpdatedAt)
 	if err != nil {
-		return nil, err
+		return NodeConnection{}, err
 	}
 
-	return &nodeConn, nil
+	return nodeConn, nil
 }

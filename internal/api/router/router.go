@@ -1,12 +1,13 @@
 package router
 
 import (
+	"hyperfulcrum/internal/api/handlers"
 	"hyperfulcrum/internal/api/middleware"
-	"hyperfulcrum/internal/api/services"
+
 	"net/http"
 )
 
-func NewRouter(projectService *services.ProjectService, nodeService *services.NodeService, nodeConnectionService *services.NodeConnectionService) *http.ServeMux {
+func NewRouter(ProjectHandler *handlers.ProjectHandler, NodeHandler *handlers.NodeHandler, NodeConnectionHandler *handlers.NodeConnectionHandler) *http.ServeMux {
 
 	mux := http.NewServeMux()
 
@@ -15,25 +16,25 @@ func NewRouter(projectService *services.ProjectService, nodeService *services.No
 	nodeConnectionValidator := middleware.NodeConnectionValidator
 
 	//Project routes
-	mux.HandleFunc("GET /projects/", projectService.ListProjects)
-	mux.Handle("POST /projects", projectValidator(http.HandlerFunc(projectService.CreateProject)))
-	mux.HandleFunc("GET /projects/ready", projectService.GetReadyProjects)
-	mux.HandleFunc("GET /projects/{id}", projectService.GetProjectByID)
-	mux.HandleFunc("DELETE /projects/{id}", projectService.RemoveProject)
+	mux.HandleFunc("GET /projects/", ProjectHandler.ListProjects)
+	mux.Handle("POST /projects", projectValidator(http.HandlerFunc(ProjectHandler.CreateProject)))
+	mux.HandleFunc("GET /projects/ready", ProjectHandler.GetReadyProjects)
+	mux.HandleFunc("GET /projects/{id}", ProjectHandler.GetProjectByID)
+	mux.HandleFunc("DELETE /projects/{id}", ProjectHandler.RemoveProject)
 
 	// Node routes
-	mux.Handle("POST /projects/{projectId}/nodes", nodeValidator(http.HandlerFunc(nodeService.AddNode)))
-	mux.HandleFunc("GET /projects/{projectId}/nodes", nodeService.ListNodes)
-	mux.HandleFunc("DELETE /nodes/{id}", nodeService.RemoveNode)
-	mux.HandleFunc("PUT /nodes/{id}/name", nodeService.UpdateNodeName)
-	mux.HandleFunc("PATCH /nodes/{id}/status", nodeService.UpdateNodeStatus)
-	mux.HandleFunc("PATCH /nodes/{id}/type", nodeService.UpdateNodeType)
+	mux.Handle("POST /projects/{projectId}/nodes", nodeValidator(http.HandlerFunc(NodeHandler.AddNode)))
+	mux.HandleFunc("GET /projects/{projectId}/nodes", NodeHandler.ListNodes)
+	mux.HandleFunc("DELETE /nodes/{id}", NodeHandler.RemoveNode)
+	mux.HandleFunc("PUT /nodes/{id}/name", NodeHandler.UpdateNodeName)
+	mux.HandleFunc("PATCH /nodes/{id}/status", NodeHandler.UpdateNodeStatus)
+	mux.HandleFunc("PATCH /nodes/{id}/type", NodeHandler.UpdateNodeType)
 
 	// node connection routes
-	mux.Handle("POST /nodes/{nodeId}/connection", nodeConnectionValidator(http.HandlerFunc(nodeConnectionService.AddNodeConnection)))
-	mux.HandleFunc("DELETE /nodes/{nodeId}/connection", nodeConnectionService.RemoveNodeConnection)
-	mux.HandleFunc("PATCH /nodes/{nodeId}/connection", nodeConnectionService.UpdateNodeConnection)
-	mux.HandleFunc("GET /nodes/{nodeId}/connectio", nodeConnectionService.GetNodeConnectionByID)
+	mux.Handle("POST /nodes/{nodeId}/connection", nodeConnectionValidator(http.HandlerFunc(NodeConnectionHandler.AddNodeConnection)))
+	mux.HandleFunc("DELETE /nodes/{nodeId}/connection", NodeConnectionHandler.RemoveNodeConnection)
+	mux.HandleFunc("PATCH /nodes/{nodeId}/connection", NodeConnectionHandler.UpdateNodeConnection)
+	mux.HandleFunc("GET /nodes/{nodeId}/connectio", NodeConnectionHandler.GetNodeConnectionByID)
 
 	//http://localhost:8080/nodes/c5f8bcd2-a2b6-4416-9001-699ea1621538/name?name=nodee-1
 	return mux

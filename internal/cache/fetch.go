@@ -33,7 +33,7 @@ func (f *Fetcher) RefreshProject(ctx context.Context, projectID string) error {
 	if err != nil {
 		return fmt.Errorf("fetch project %s: %w", projectID, err)
 	}
-	f.cache.Projects.Set(projectID, *project)
+	f.cache.Projects.Set(projectID, project)
 
 	nodes, err := f.nodesRepo.NodesGetByPorjectID(ctx, projectID) //GetNodesByProjectID
 	if err != nil {
@@ -46,7 +46,7 @@ func (f *Fetcher) RefreshProject(ctx context.Context, projectID string) error {
 		if err != nil {
 			return fmt.Errorf("fetch connections for node %s: %w", node.ID, err)
 		}
-		f.cache.Connections.Set(node.ID, *connections)
+		f.cache.Connections.Set(node.ID, connections)
 	}
 
 	return nil
@@ -97,6 +97,6 @@ func (f *Fetcher) GetConnections(ctx context.Context, nodeID string) (repository
 		return repository.NodeConnection{}, fmt.Errorf("fetch connections for node %s: %w", nodeID, err)
 	}
 
-	f.cache.Connections.Set(nodeID, *connections)
-	return *connections, nil
+	f.cache.Connections.Set(nodeID, connections)
+	return connections, nil
 }

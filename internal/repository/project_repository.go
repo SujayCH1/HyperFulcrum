@@ -29,9 +29,9 @@ func NewProjectRepository(connConfig *sql.DB) *ProjectRepository {
 }
 
 func (r *ProjectRepository) ProjectAdd(
-	ctx context.Context, name string, description string) (*Project, error) {
+	ctx context.Context, name string, description string) (Project, error) {
 
-	project := &Project{
+	project := Project{
 		ID:          uuid.New().String(),
 		Name:        name,
 		Description: description,
@@ -60,7 +60,7 @@ func (r *ProjectRepository) ProjectAdd(
 		&project.UpdatedAt,
 	)
 	if err != nil {
-		return nil, err
+		return Project{}, err
 	}
 
 	return project, nil
@@ -90,7 +90,7 @@ func (r *ProjectRepository) ProjectRemove(ctx context.Context, id string) error 
 	return nil
 }
 
-func (r *ProjectRepository) ProjectList(ctx context.Context) ([]*Project, error) {
+func (r *ProjectRepository) ProjectList(ctx context.Context) ([]Project, error) {
 	query := `
 		SELECT id, name, description, node_count, ready, running, created_at, updated_at
 		FROM projects
@@ -103,9 +103,9 @@ func (r *ProjectRepository) ProjectList(ctx context.Context) ([]*Project, error)
 	}
 	defer rows.Close()
 
-	var projects []*Project
+	var projects []Project
 	for rows.Next() {
-		project := &Project{}
+		project := Project{}
 		err := rows.Scan(
 			&project.ID,
 			&project.Name,
@@ -129,10 +129,10 @@ func (r *ProjectRepository) ProjectList(ctx context.Context) ([]*Project, error)
 	return projects, nil
 }
 
-func (r *ProjectRepository) ProjectGetByID(ctx context.Context, id string) (*Project, error) {
+func (r *ProjectRepository) ProjectGetByID(ctx context.Context, id string) (Project, error) {
 	projectID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, err
+		return Project{}, err
 	}
 
 	query := `
@@ -143,7 +143,7 @@ func (r *ProjectRepository) ProjectGetByID(ctx context.Context, id string) (*Pro
 
 	row := r.conn.QueryRowContext(ctx, query, projectID)
 
-	project := &Project{}
+	project := Project{}
 	err = row.Scan(
 		&project.ID,
 		&project.Name,
@@ -155,7 +155,7 @@ func (r *ProjectRepository) ProjectGetByID(ctx context.Context, id string) (*Pro
 		&project.UpdatedAt,
 	)
 	if err != nil {
-		return nil, err
+		return Project{}, err
 	}
 
 	return project, nil
@@ -225,8 +225,7 @@ func (r *ProjectRepository) ProjectUpdateRunning(ctx context.Context, id string,
 	return project, nil
 }
 
-
-func (r *ProjectRepository) ProjectGetReady(ctx context.Context) ([]*Project, error) {
+func (r *ProjectRepository) ProjectGetReady(ctx context.Context) ([]Project, error) {
 	query := `SELECT id,name,description,node_count,ready,running,created_at,updated_at 
 	FROM projects WHERE ready=TRUE`
 
@@ -236,9 +235,9 @@ func (r *ProjectRepository) ProjectGetReady(ctx context.Context) ([]*Project, er
 	}
 	defer rows.Close()
 
-	var projects []*Project
+	var projects []Project
 	for rows.Next() {
-		project := &Project{}
+		project := Project{}
 		err := rows.Scan(&project.ID,
 			&project.Name,
 			&project.Description,

@@ -1,21 +1,27 @@
-package services
+package handlers
 
 import (
 	"hyperfulcrum/internal/api/middleware"
+	"hyperfulcrum/internal/metadata"
 	"hyperfulcrum/internal/repository"
 	"hyperfulcrum/pkg/utils"
 	"net/http"
 )
 
-type NodeConnectionService struct {
-	repo *repository.NodeConnectionRepository
+type NodeConnectionHandler struct {
+	service *metadata.NodeConnectionService
 }
 
-func NewNodeConnectionService(repo *repository.NodeConnectionRepository) *NodeConnectionService {
-	return &NodeConnectionService{repo: repo}
+func NewNodeConnectionHandler(
+	service *metadata.NodeConnectionService,
+) *NodeConnectionHandler {
+
+	return &NodeConnectionHandler{
+		service: service,
+	}
 }
 
-func (s *NodeConnectionService) AddNodeConnection(w http.ResponseWriter, r *http.Request) {
+func (s *NodeConnectionHandler) AddNodeConnection(w http.ResponseWriter, r *http.Request) {
 	payload, ok := middleware.GetNodeConnectionPayload(r)
 	if !ok {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve payload", nil)
@@ -30,7 +36,7 @@ func (s *NodeConnectionService) AddNodeConnection(w http.ResponseWriter, r *http
 	nodeConnection.Username = payload.Username
 	nodeConnection.Password = payload.Password
 
-	err := s.repo.ConnectionAdd(
+	err := s.service.AddConnection(
 		r.Context(),
 		&nodeConnection,
 	)
@@ -43,14 +49,14 @@ func (s *NodeConnectionService) AddNodeConnection(w http.ResponseWriter, r *http
 	utils.WriteJSONSuccessResponse(w, http.StatusCreated, "Node connection successfully added", payload)
 }
 
-func (s *NodeConnectionService) RemoveNodeConnection(w http.ResponseWriter, r *http.Request) {
+func (s *NodeConnectionHandler) RemoveNodeConnection(w http.ResponseWriter, r *http.Request) {
 	payload, ok := middleware.GetNodeConnectionPayload(r)
 	if !ok {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve payload", nil)
 		return
 	}
 
-	err := s.repo.ConnectionRemove(r.Context(), payload.NodeID)
+	err := s.service.RemoveConnection(r.Context(), payload.NodeID)
 
 	if err != nil {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to remove node connection", err)
@@ -60,7 +66,7 @@ func (s *NodeConnectionService) RemoveNodeConnection(w http.ResponseWriter, r *h
 	utils.WriteJSONSuccessResponse(w, http.StatusCreated, "Node connection successfully added", payload)
 }
 
-func (s *NodeConnectionService) UpdateNodeConnection(w http.ResponseWriter, r *http.Request) {
+func (s *NodeConnectionHandler) UpdateNodeConnection(w http.ResponseWriter, r *http.Request) {
 	payload, ok := middleware.GetNodeConnectionPayload(r)
 	if !ok {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve payload", nil)
@@ -75,7 +81,7 @@ func (s *NodeConnectionService) UpdateNodeConnection(w http.ResponseWriter, r *h
 	nodeConnection.Username = payload.Username
 	nodeConnection.Password = payload.Password
 
-	err := s.repo.ConnectionUpdate(r.Context(), &nodeConnection)
+	err := s.service.UpdateConnection(r.Context(), &nodeConnection)
 	if err != nil {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to update node connection", err)
 		return
@@ -84,14 +90,14 @@ func (s *NodeConnectionService) UpdateNodeConnection(w http.ResponseWriter, r *h
 	utils.WriteJSONSuccessResponse(w, http.StatusCreated, "Node connection successfully added", payload)
 }
 
-func (s *NodeConnectionService) GetNodeConnectionByID(w http.ResponseWriter, r *http.Request) {
+func (s *NodeConnectionHandler) GetNodeConnectionByID(w http.ResponseWriter, r *http.Request) {
 	payload, ok := middleware.GetNodeConnectionPayload(r)
 	if !ok {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve payload", nil)
 		return
 	}
 
-	nodeConn, err := s.repo.GetConnectionByNodeId(r.Context(), payload.NodeID)
+	nodeConn, err := s.service.GetConnectionByNodeID(r.Context(), payload.NodeID)
 	if err != nil {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to get node connection", err)
 		return

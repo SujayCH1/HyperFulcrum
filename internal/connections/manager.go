@@ -46,7 +46,7 @@ func (m *ConnectionManager) InitiateActiveConnections(ctx context.Context) error
 				continue
 			}
 
-			dsn := buildDSN(*connInfo)
+			dsn := buildDSN(connInfo)
 
 			db, err := NewConnection(ctx, dsn)
 			if err != nil {
@@ -79,7 +79,7 @@ func (m *ConnectionManager) InititateConnectionsAll(ctx context.Context) error {
 				continue
 			}
 
-			dsn := buildDSN(*connInfo)
+			dsn := buildDSN(connInfo)
 
 			db, err := NewConnection(ctx, dsn)
 			if err != nil {

@@ -1,22 +1,27 @@
-package services
+package handlers
 
 import (
 	"hyperfulcrum/internal/api/middleware"
-	"hyperfulcrum/internal/repository"
+	"hyperfulcrum/internal/metadata"
 	"hyperfulcrum/pkg/utils"
 	"net/http"
 	"strconv"
 )
 
-type NodeService struct {
-	repo *repository.NodeRepository
+type NodeHandler struct {
+	service *metadata.NodeService
 }
 
-func NewNodeService(repo *repository.NodeRepository) *NodeService {
-	return &NodeService{repo: repo}
+func NewNodeHandler(
+	service *metadata.NodeService,
+) *NodeHandler {
+
+	return &NodeHandler{
+		service: service,
+	}
 }
 
-func (h *NodeService) AddNode(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) AddNode(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("projectId")
 	if projectID == "" {
 		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "projectID is required", nil)
@@ -29,7 +34,7 @@ func (h *NodeService) AddNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.repo.NodeAdd(r.Context(), projectID, payload.Type, payload.Name)
+	err := h.service.AddNode(r.Context(), projectID, payload.Type, payload.Name)
 	if err != nil {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to add node", err)
 		return
@@ -38,14 +43,14 @@ func (h *NodeService) AddNode(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJSONSuccessResponse(w, http.StatusCreated, "Node added successfully", nil)
 }
 
-func (h *NodeService) ListNodes(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) ListNodes(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("projectId")
 	if projectID == "" {
 		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "projectID is required", nil)
 		return
 	}
 
-	nodes, err := h.repo.NodeList(r.Context(), projectID)
+	nodes, err := h.service.ListNodes(r.Context(), projectID)
 	if err != nil {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to list nodes", err)
 		return
@@ -54,14 +59,14 @@ func (h *NodeService) ListNodes(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJSONSuccessResponse(w, http.StatusOK, "Nodes retrieved successfully", nodes)
 }
 
-func (h *NodeService) RemoveNode(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) RemoveNode(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.PathValue("id")
 	if nodeID == "" {
 		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "nodeID is required", nil)
 		return
 	}
 
-	err := h.repo.NodeRemove(r.Context(), nodeID)
+	err := h.service.RemoveNode(r.Context(), nodeID)
 	if err != nil {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to remove node", err)
 		return
@@ -70,7 +75,7 @@ func (h *NodeService) RemoveNode(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJSONSuccessResponse(w, http.StatusOK, "Node removed successfully", nil)
 }
 
-func (h *NodeService) UpdateNodeName(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) UpdateNodeName(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.PathValue("id")
 	name := r.URL.Query().Get("name")
 
@@ -79,7 +84,7 @@ func (h *NodeService) UpdateNodeName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.repo.NodeUpdateName(r.Context(), nodeID, name)
+	err := h.service.UpdateNodeName(r.Context(), nodeID, name)
 	if err != nil {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to update node name", err)
 		return
@@ -88,7 +93,7 @@ func (h *NodeService) UpdateNodeName(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJSONSuccessResponse(w, http.StatusOK, "Node name updated successfully", nil)
 }
 
-func (h *NodeService) UpdateNodeStatus(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) UpdateNodeStatus(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.PathValue("id")
 	statusStr := r.URL.Query().Get("status")
 
@@ -103,7 +108,7 @@ func (h *NodeService) UpdateNodeStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.repo.NodeUpdateStatus(r.Context(), nodeID, status)
+	err = h.service.UpdateNodeStatus(r.Context(), nodeID, status)
 	if err != nil {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to update node status", err)
 		return
@@ -112,7 +117,7 @@ func (h *NodeService) UpdateNodeStatus(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJSONSuccessResponse(w, http.StatusOK, "Node status updated successfully", nil)
 }
 
-func (h *NodeService) UpdateNodeType(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) UpdateNodeType(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.PathValue("id")
 	nodeType := r.URL.Query().Get("type")
 
@@ -121,7 +126,7 @@ func (h *NodeService) UpdateNodeType(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.repo.NodeUpdateType(r.Context(), nodeID, nodeType)
+	err := h.service.UpdateNodeType(r.Context(), nodeID, nodeType)
 	if err != nil {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to update node type", err)
 		return
