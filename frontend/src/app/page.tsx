@@ -37,10 +37,10 @@ function CreateDrawer({ open, onClose, onSuccess }: {
   onClose: () => void;
   onSuccess: (p: Project) => void;
 }) {
-  const [name, setName]   = useState("");
-  const [desc, setDesc]   = useState("");
-  const [busy, setBusy]   = useState(false);
-  const createProject     = useProjectStore((s) => s.createProject);
+  const [name, setName] = useState("");
+  const [desc, setDesc] = useState("");
+  const [busy, setBusy] = useState(false);
+  const createProject   = useProjectStore((s) => s.createProject);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -69,7 +69,7 @@ function CreateDrawer({ open, onClose, onSuccess }: {
 
   if (!open) return null;
 
-  const hasName  = Boolean(name.trim());
+  const hasName   = Boolean(name.trim());
   const glowStyle = hasName ? { boxShadow: "0 0 0 2px rgba(16,185,129,0.3)" } : {};
 
   return (
@@ -152,9 +152,9 @@ function CreateDrawer({ open, onClose, onSuccess }: {
                 <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.2em] mb-3.5">What happens next</p>
                 <div className="space-y-2.5">
                   {[
-                    { n: "01", t: "Walkthrough",     d: "See how the system works" },
-                    { n: "02", t: "Write Schema",    d: "Define SQL tables & indexes" },
-                    { n: "03", t: "Configure Shards",d: "Set node count & deploy" },
+                    { n: "01", t: "Walkthrough",      d: "See how the system works" },
+                    { n: "02", t: "Write Schema",     d: "Define SQL tables & indexes" },
+                    { n: "03", t: "Configure Shards", d: "Set node count & deploy" },
                   ].map((s) => (
                     <div key={s.n} className="flex items-center gap-3">
                       <span className="text-[9px] font-mono text-zinc-700 w-4 flex-shrink-0">{s.n}</span>
@@ -209,8 +209,9 @@ function CreateDrawer({ open, onClose, onSuccess }: {
               </div>
               {desc && <p className="text-zinc-600 text-[10px] font-mono mb-3 leading-relaxed line-clamp-2">{desc}</p>}
               <div className="flex gap-1.5">
+                {/* Go returns ready: boolean — new projects start as not ready */}
                 <span className="text-[9px] font-mono text-zinc-500 bg-zinc-800 rounded px-2 py-0.5">idle</span>
-                <span className="text-[9px] font-mono text-zinc-600 rounded px-2 py-0.5">0 shards</span>
+                <span className="text-[9px] font-mono text-zinc-600 rounded px-2 py-0.5">0 nodes</span>
               </div>
             </div>
 
@@ -314,8 +315,10 @@ export default function HomePage() {
               />
               <path d="M 64 89 L 78 79 L 76 93 Z" fill="#10b981" opacity="0.8" />
             </svg>
-            <div className="absolute text-[11px] text-emerald-400 font-mono whitespace-nowrap px-2 py-0.5 rounded animate-fade-up"
-              style={{ top: 0, right: 0, background: "rgba(5,5,5,0.85)", border: "1px solid rgba(16,185,129,0.2)" }}>
+            <div
+              className="absolute text-[11px] text-emerald-400 font-mono whitespace-nowrap px-2 py-0.5 rounded animate-fade-up"
+              style={{ top: 0, right: 0, background: "rgba(5,5,5,0.85)", border: "1px solid rgba(16,185,129,0.2)" }}
+            >
               ↗ start here
             </div>
           </div>
@@ -352,10 +355,11 @@ export default function HomePage() {
             <p className="text-[9px] font-mono text-zinc-700 uppercase tracking-[0.24em] mb-4 text-center">Recent Projects</p>
             <div className="space-y-2">
               {projects.slice(0, 6).map((p) => {
-                const isActive = p.status === "active";
-                const badge = isActive
-                  ? { color: "#34d399", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.2)" }
-                  : { color: "#71717a", bg: "#18181b", border: "#27272a" };
+                // Go uses ready: boolean instead of status string
+                const isReady = p.ready;
+                const badge = isReady
+                  ? { color: "#34d399", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.2)", label: "ready" }
+                  : { color: "#71717a", bg: "#18181b", border: "#27272a", label: "idle" };
                 return (
                   <a
                     key={p.id}
@@ -370,14 +374,17 @@ export default function HomePage() {
                       <div>
                         <div className="text-zinc-300 font-mono text-sm font-semibold">{p.name}</div>
                         <div className="text-zinc-600 text-[10px] font-mono">
-                          {p.shard_count ?? 0} shards{p.description ? " · " + p.description.slice(0, 38) : ""}
+                          {/* node_count replaces shard_count */}
+                          {p.node_count ?? 0} nodes{p.description ? " · " + p.description.slice(0, 38) : ""}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                      <span className="text-[9px] font-mono px-2 py-0.5 rounded"
-                        style={{ color: badge.color, background: badge.bg, border: `1px solid ${badge.border}` }}>
-                        {p.status}
+                      <span
+                        className="text-[9px] font-mono px-2 py-0.5 rounded"
+                        style={{ color: badge.color, background: badge.bg, border: `1px solid ${badge.border}` }}
+                      >
+                        {badge.label}
                       </span>
                       <ChevronRight size={13} className="text-zinc-600 group-hover:text-zinc-400 transition-colors" />
                     </div>

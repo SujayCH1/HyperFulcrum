@@ -1,35 +1,40 @@
-import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+// // app/api/logs/route.ts
+// // No DB, no Go backend endpoint for logs yet.
+// // Logs are managed in-memory via Zustand (projectStore → addLog / clearLogs).
+// // These endpoints are kept as stubs so any existing fetch("/api/logs") calls
+// // don't 404 — they just return the in-memory log array passed in the request.
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const projectId = searchParams.get("project_id");
-  if (!projectId) return NextResponse.json({ error: "project_id required" }, { status: 400 });
-  try {
-    const { rows } = await pool.query(
-      `SELECT * FROM orchestration_logs
-       WHERE project_id=$1
-       ORDER BY timestamp DESC LIMIT 200`,
-      [projectId]
-    );
-    return NextResponse.json(rows);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Failed to fetch logs" }, { status: 500 });
-  }
-}
+// import { NextResponse } from "next/server";
 
-export async function POST(request: Request) {
-  try {
-    const { project_id, message, level = "info" } = await request.json();
-    const { rows } = await pool.query(
-      `INSERT INTO orchestration_logs (project_id, message, level)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [project_id, message, level]
-    );
-    return NextResponse.json(rows[0]);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Failed to write log" }, { status: 500 });
-  }
-}
+// // GET /api/logs?project_id=X
+// // Returns empty array — caller should read logs from Zustand store directly
+// // instead of fetching this route. This stub prevents 404s during migration.
+// export async function GET(request: Request) {
+//   const { searchParams } = new URL(request.url);
+//   const projectId = searchParams.get("project_id");
+
+//   if (!projectId) {
+//     return NextResponse.json({ error: "project_id required" }, { status: 400 });
+//   }
+
+//   // No DB — logs live in Zustand store on the client
+//   return NextResponse.json([]);
+// }
+
+// // POST /api/logs
+// // No-op stub — logging is done via store.addLog() on the client side.
+// export async function POST(request: Request) {
+//   try {
+//     const body = await request.json();
+//     // Acknowledge the write without persisting anything
+//     return NextResponse.json({
+//       id: crypto.randomUUID(),
+//       project_id: body.project_id ?? "",
+//       message: body.message ?? "",
+//       level: body.level ?? "info",
+//       timestamp: new Date().toISOString(),
+//     });
+//   } catch {
+//     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+//   }
+// }

@@ -1,46 +1,57 @@
-import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+// // app/api/shards/batch/route.ts
+// // Calls Go POST /projects/:id/nodes N times
+// // Go NodeDto expects: { name, type, index, status } — NOT node_name/node_type
 
-export async function POST(request: Request) {
-  try {
-    const { project_id, count } = await request.json();
-    if (!project_id || !count) {
-      return NextResponse.json({ error: "project_id and count required" }, { status: 400 });
-    }
+// const GO_API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      const inserted: unknown[] = [];
-      for (let i = 0; i < count; i++) {
-        const shardKey = `shard_${String.fromCharCode(97 + i)}`;       // shard_a, shard_b, …
-        const nodeHost = `node-${String(i + 1).padStart(2, "0")}.local`; // node-01.local, …
-        const { rows } = await client.query(
-          `INSERT INTO shards (project_id, shard_key, node_host, status)
-           VALUES ($1, $2, $3, 'active') RETURNING *`,
-          [project_id, shardKey, nodeHost]
-        );
-        inserted.push(rows[0]);
-      }
-      await client.query(
-        `UPDATE projects SET shard_count=$1, status='active' WHERE id=$2`,
-        [count, project_id]
-      );
-      await client.query(
-        `INSERT INTO orchestration_logs (project_id, message, level)
-         VALUES ($1, $2, 'info')`,
-        [project_id, `Deployed ${count} shard node(s)`]
-      );
-      await client.query("COMMIT");
-      return NextResponse.json(inserted);
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Failed to deploy shards" }, { status: 500 });
-  }
-}
+// export async function POST(request: Request) {
+//   try {
+//     const { project_id, count } = await request.json();
+
+//     if (!project_id || !count) {
+//       return Response.json({ error: "project_id and count required" }, { status: 400 });
+//     }
+
+//     const inserted: unknown[] = [];
+//     const failed: { index: number; error: string }[] = [];
+
+//     for (let i = 0; i < count; i++) {
+//       const nodeName = `shard_${String.fromCharCode(97 + i)}`; // shard_a, shard_b, …
+
+//       try {
+//         const res = await fetch(`${GO_API}/projects/${project_id}/nodes`, {
+//           method: "POST",
+//           headers: { "Content-Type": "application/json" },
+//           body: JSON.stringify({
+//             name: nodeName,   // Go NodeDto field: "name"
+//             type: "shard",    // Go NodeDto field: "type" — must be "shard" or "replica"
+//             index: i,         // Go NodeDto field: "index"
+//             status: false,    // Go NodeDto field: "status"
+//           }),
+//         });
+
+//         const data = await res.json();
+
+//         if (!res.ok) {
+//           failed.push({ index: i, error: data?.message ?? data?.error ?? "Unknown error" });
+//         } else {
+//           inserted.push(data);
+//         }
+//       } catch (err) {
+//         failed.push({ index: i, error: (err as Error).message });
+//       }
+//     }
+
+//     if (failed.length > 0) {
+//       return Response.json(
+//         { inserted, failed, message: `${inserted.length} of ${count} nodes created` },
+//         { status: failed.length === count ? 500 : 207 }
+//       );
+//     }
+
+//     return Response.json(inserted);
+//   } catch (err) {
+//     console.error(err);
+//     return Response.json({ error: "Failed to deploy nodes" }, { status: 500 });
+//   }
+// }
