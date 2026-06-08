@@ -97,17 +97,7 @@ func (s *NodeConnectionHandler) GetNodeConnectionByID(w http.ResponseWriter, r *
 		return
 	}
 
-<<<<<<< HEAD:internal/api/handlers/node_connection_handler.go
 	nodeConn, err := s.service.GetConnectionByNodeID(r.Context(), payload.NodeID)
-=======
-	// node, conn := cache.NodeCOnnectioNCache.GetConn.....
-
-<<<<<<< HEAD:internal/api/services/node_connection_handler.go
-	nodeConn, err := s.repo.GetConnectionByNodeId(r.Context(), payload.NodeID)
-=======
-	nodeConn, err := s.service.GetConnectionByNodeID(r.Context(), payload.NodeID)
->>>>>>> 6983ed7 (added node manager repo and migraitons):internal/api/handlers/node_connection_handler.go
->>>>>>> 4b7c581 (added node manager repo and migraitons):internal/api/services/node_connection_handler.go
 	if err != nil {
 		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to get node connection", err)
 		return
