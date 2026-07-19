@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"hyperfulcrum/internal/api/handlers"
+	"hyperfulcrum/internal/api/middleware"
 	"hyperfulcrum/internal/api/router"
 	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/connections"
@@ -14,7 +15,6 @@ import (
 	"hyperfulcrum/internal/repository"
 	"hyperfulcrum/pkg/logger"
 	"net/http"
-	"hyperfulcrum/internal/api/middleware"
 )
 
 type Application struct {
@@ -27,6 +27,7 @@ type Application struct {
 	ProjectRepo  *repository.ProjectRepository
 	NodeRepo     *repository.NodeRepository
 	NodeConnRepo *repository.NodeConnectionRepository
+	TopologyRepo *repository.NodeTopologyRepository
 
 	// metadata services
 	ProjectService        *metadata.ProjectService
@@ -43,8 +44,8 @@ type Application struct {
 	ConnectionManager *connections.ConnectionManager
 
 	// cache
-	CacheManager *cache.CacheManager
-	CacheFetcher *cache.Fetcher
+	CacheManager   *cache.CacheManager
+	CacheRefresher *cache.CacheRefresher
 
 	// api
 	Server *http.ServeMux
@@ -81,6 +82,7 @@ func (a *Application) Start(ctx context.Context) error {
 	a.ProjectRepo = repository.NewProjectRepository(a.database)
 	a.NodeRepo = repository.NewNodeRepository(a.database)
 	a.NodeConnRepo = repository.NewNodeConnectionRepository(a.database)
+	a.TopologyRepo = repository.NewNodeTopologyRepo(a.database)
 
 	logger.Logger.Info("Repositories initialized")
 
@@ -88,14 +90,24 @@ func (a *Application) Start(ctx context.Context) error {
 	logger.Logger.Info("Initializing cache manager")
 
 	a.CacheManager = cache.NewCacheManager()
-	a.CacheFetcher = cache.NewFetcher(
-		*a.ProjectRepo,
-		*a.NodeRepo,
-		*a.NodeConnRepo,
+
+	a.CacheRefresher = cache.NewCacheRefresher(
+		a.ProjectRepo,
+		a.NodeRepo,
+		a.NodeConnRepo,
+		a.TopologyRepo,
 		a.CacheManager,
 	)
 
 	logger.Logger.Info("Cache manager initialized")
+
+	logger.Logger.Info("Loading metadata into cache")
+
+	if err := a.CacheRefresher.RefreshAllProjects(ctx); err != nil {
+		return fmt.Errorf("load metadata cache: %w", err)
+	}
+
+	logger.Logger.Info("Metadata cache loaded")
 
 	// Connections
 	logger.Logger.Info("Initializing connection manager")
@@ -116,14 +128,21 @@ func (a *Application) Start(ctx context.Context) error {
 	// metadata services
 	a.ProjectService = metadata.NewProjectService(
 		a.ProjectRepo,
+		a.CacheManager,
+		a.CacheRefresher,
 	)
 
 	a.NodeService = metadata.NewNodeService(
 		a.NodeRepo,
+		a.CacheManager,
+		a.CacheRefresher,
 	)
 
 	a.NodeConnectionService = metadata.NewNodeConnectionService(
 		a.NodeConnRepo,
+		a.NodeRepo,
+		a.CacheManager,
+		a.CacheRefresher,
 	)
 
 	// handlers

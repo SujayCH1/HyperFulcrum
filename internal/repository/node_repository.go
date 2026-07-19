@@ -217,7 +217,7 @@ func (r *NodeRepository) NodesGetByPorjectID(ctx context.Context, projectID stri
 
 	query := `
 		SELECT 
-		id, project_id, node_name, node__index, node_status, node_type, created_at
+		id, project_id, node_name, node_index, node_status, node_type, created_at
 		FROM nodes
 		WHERE project_id = $1
 	`
@@ -252,6 +252,40 @@ func (r *NodeRepository) NodesGetByPorjectID(ctx context.Context, projectID stri
 	}
 
 	return nodes, nil
+
+}
+
+func (r *NodeRepository) NodeGetByID(ctx context.Context, nodeID string) (Node, error) {
+
+	query := `
+		SELECT 
+		id, project_id, node_name, node_index, node_status, node_type, created_at
+		FROM nodes
+		WHERE id = $1
+	`
+
+	row := r.conn.QueryRowContext(
+		ctx,
+		query,
+		nodeID,
+	)
+
+	var node Node
+
+	err := row.Scan(
+		&node.ID,
+		&node.ProjectID,
+		&node.Name,
+		&node.Index,
+		&node.Status,
+		&node.Type,
+		&node.CreatedAt,
+	)
+	if err != nil {
+		return Node{}, err
+	}
+
+	return node, nil
 
 }
 

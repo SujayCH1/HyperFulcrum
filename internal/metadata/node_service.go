@@ -3,19 +3,26 @@ package metadata
 import (
 	"context"
 
+	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/repository"
 )
 
 type NodeService struct {
-	repo *repository.NodeRepository
+	repo      *repository.NodeRepository
+	cache     *cache.CacheManager
+	refresher *cache.CacheRefresher
 }
 
 func NewNodeService(
 	repo *repository.NodeRepository,
+	cache *cache.CacheManager,
+	refresher *cache.CacheRefresher,
 ) *NodeService {
 
 	return &NodeService{
-		repo: repo,
+		repo:      repo,
+		cache:     cache,
+		refresher: refresher,
 	}
 }
 
@@ -26,12 +33,17 @@ func (s *NodeService) AddNode(
 	name string,
 ) error {
 
-	return s.repo.NodeAdd(
+	err := s.repo.NodeAdd(
 		ctx,
 		projectID,
 		nodeType,
 		name,
 	)
+	if err != nil {
+		return err
+	}
+
+	return s.refresher.RefreshNodes(ctx, projectID)
 }
 
 func (s *NodeService) ListNodes(
@@ -39,10 +51,19 @@ func (s *NodeService) ListNodes(
 	projectID string,
 ) ([]repository.Node, error) {
 
-	return s.repo.NodeList(
+	nodes, err := s.repo.NodeList(
 		ctx,
 		projectID,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, node := range nodes {
+		s.cache.Nodes.Set(node)
+	}
+
+	return nodes, nil
 }
 
 func (s *NodeService) RemoveNode(
@@ -50,9 +71,25 @@ func (s *NodeService) RemoveNode(
 	nodeID string,
 ) error {
 
-	return s.repo.NodeRemove(
+	node, err := s.repo.NodeGetByID(
 		ctx,
 		nodeID,
+	)
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.NodeRemove(
+		ctx,
+		nodeID,
+	)
+	if err != nil {
+		return err
+	}
+
+	return s.refresher.RefreshNodes(
+		ctx,
+		node.ProjectID,
 	)
 }
 
@@ -62,10 +99,26 @@ func (s *NodeService) UpdateNodeName(
 	name string,
 ) error {
 
-	return s.repo.NodeUpdateName(
+	node, err := s.repo.NodeGetByID(
+		ctx,
+		nodeID,
+	)
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.NodeUpdateName(
 		ctx,
 		nodeID,
 		name,
+	)
+	if err != nil {
+		return err
+	}
+
+	return s.refresher.RefreshNodes(
+		ctx,
+		node.ProjectID,
 	)
 }
 
@@ -75,10 +128,26 @@ func (s *NodeService) UpdateNodeStatus(
 	status bool,
 ) error {
 
-	return s.repo.NodeUpdateStatus(
+	node, err := s.repo.NodeGetByID(
+		ctx,
+		nodeID,
+	)
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.NodeUpdateStatus(
 		ctx,
 		nodeID,
 		status,
+	)
+	if err != nil {
+		return err
+	}
+
+	return s.refresher.RefreshNodes(
+		ctx,
+		node.ProjectID,
 	)
 }
 
@@ -88,9 +157,25 @@ func (s *NodeService) UpdateNodeType(
 	nodeType string,
 ) error {
 
-	return s.repo.NodeUpdateType(
+	node, err := s.repo.NodeGetByID(
+		ctx,
+		nodeID,
+	)
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.NodeUpdateType(
 		ctx,
 		nodeID,
 		nodeType,
+	)
+	if err != nil {
+		return err
+	}
+
+	return s.refresher.RefreshNodes(
+		ctx,
+		node.ProjectID,
 	)
 }

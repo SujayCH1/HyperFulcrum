@@ -3,19 +3,29 @@ package metadata
 import (
 	"context"
 
+	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/repository"
 )
 
 type NodeConnectionService struct {
-	repo *repository.NodeConnectionRepository
+	repo      *repository.NodeConnectionRepository
+	nodeRepo  *repository.NodeRepository
+	cache     *cache.CacheManager
+	refresher *cache.CacheRefresher
 }
 
 func NewNodeConnectionService(
 	repo *repository.NodeConnectionRepository,
+	nodeRepo *repository.NodeRepository,
+	cache *cache.CacheManager,
+	refresher *cache.CacheRefresher,
 ) *NodeConnectionService {
 
 	return &NodeConnectionService{
-		repo: repo,
+		repo:      repo,
+		nodeRepo:  nodeRepo,
+		cache:     cache,
+		refresher: refresher,
 	}
 }
 
@@ -24,9 +34,25 @@ func (s *NodeConnectionService) AddConnection(
 	connection *repository.NodeConnection,
 ) error {
 
-	return s.repo.ConnectionAdd(
+	err := s.repo.ConnectionAdd(
 		ctx,
 		connection,
+	)
+	if err != nil {
+		return err
+	}
+
+	node, err := s.nodeRepo.NodeGetByID(
+		ctx,
+		connection.NodeId,
+	)
+	if err != nil {
+		return err
+	}
+
+	return s.refresher.RefreshConnections(
+		ctx,
+		node.ProjectID,
 	)
 }
 
@@ -35,9 +61,25 @@ func (s *NodeConnectionService) RemoveConnection(
 	nodeID string,
 ) error {
 
-	return s.repo.ConnectionRemove(
+	node, err := s.nodeRepo.NodeGetByID(
 		ctx,
 		nodeID,
+	)
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.ConnectionRemove(
+		ctx,
+		nodeID,
+	)
+	if err != nil {
+		return err
+	}
+
+	return s.refresher.RefreshConnections(
+		ctx,
+		node.ProjectID,
 	)
 }
 
@@ -46,9 +88,25 @@ func (s *NodeConnectionService) UpdateConnection(
 	connection *repository.NodeConnection,
 ) error {
 
-	return s.repo.ConnectionUpdate(
+	err := s.repo.ConnectionUpdate(
 		ctx,
 		connection,
+	)
+	if err != nil {
+		return err
+	}
+
+	node, err := s.nodeRepo.NodeGetByID(
+		ctx,
+		connection.NodeId,
+	)
+	if err != nil {
+		return err
+	}
+
+	return s.refresher.RefreshConnections(
+		ctx,
+		node.ProjectID,
 	)
 }
 
@@ -57,8 +115,19 @@ func (s *NodeConnectionService) GetConnectionByNodeID(
 	nodeID string,
 ) (repository.NodeConnection, error) {
 
-	return s.repo.GetConnectionByNodeId(
+	if conn, ok := s.cache.Connections.Get(nodeID); ok {
+		return conn, nil
+	}
+
+	conn, err := s.repo.GetConnectionByNodeId(
 		ctx,
 		nodeID,
 	)
+	if err != nil {
+		return repository.NodeConnection{}, err
+	}
+
+	s.cache.Connections.Set(conn)
+
+	return conn, nil
 }
