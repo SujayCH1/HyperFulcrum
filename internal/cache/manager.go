@@ -1,19 +1,17 @@
 package cache
 
 type CacheManager struct {
-	Projects     *ProjectStore
-	Nodes        *NodeStore
-	ProjectNodes *ProjectNodeStore
-	Connections  *ConnectionStore
-	Topology     *TopologyStore
+	Projects    *ProjectStore
+	Nodes       *NodeStore
+	Connections *ConnectionStore
+	Topology    *NodeTopologyStore
 }
 
 func NewCacheManager() *CacheManager {
 	return &CacheManager{
-		Projects:     NewProjectStore(),
-		Nodes:        NewNodeStore(),
-		ProjectNodes: NewProjectNodeStore(),
-		Connections:  NewConnectionStore(),
-		Topology:     NewTopologyStore(),
+		Projects:    NewProjectStore(),
+		Nodes:       NewNodeStore(),
+		Connections: NewConnectionStore(),
+		Topology:    NewTopologyStore(),
 	}
 }

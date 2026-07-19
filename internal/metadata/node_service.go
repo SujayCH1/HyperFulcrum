@@ -43,7 +43,10 @@ func (s *NodeService) AddNode(
 		return err
 	}
 
-	return s.refresher.RefreshNodes(ctx, projectID)
+	return s.refresher.RefreshNodes(
+		ctx,
+		projectID,
+	)
 }
 
 func (s *NodeService) ListNodes(
@@ -51,19 +54,38 @@ func (s *NodeService) ListNodes(
 	projectID string,
 ) ([]repository.Node, error) {
 
-	nodes, err := s.repo.NodeList(
+	cachedNodes := s.cache.Nodes.GetAll()
+
+	var projectNodes []repository.Node
+
+	for _, node := range cachedNodes {
+		if node.ProjectID == projectID {
+			projectNodes = append(projectNodes, node)
+		}
+	}
+
+	if len(projectNodes) > 0 {
+		return projectNodes, nil
+	}
+
+	if err := s.refresher.RefreshNodes(
 		ctx,
 		projectID,
-	)
-	if err != nil {
+	); err != nil {
 		return nil, err
 	}
 
-	for _, node := range nodes {
-		s.cache.Nodes.Set(node)
+	cachedNodes = s.cache.Nodes.GetAll()
+
+	projectNodes = nil
+
+	for _, node := range cachedNodes {
+		if node.ProjectID == projectID {
+			projectNodes = append(projectNodes, node)
+		}
 	}
 
-	return nodes, nil
+	return projectNodes, nil
 }
 
 func (s *NodeService) RemoveNode(

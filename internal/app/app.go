@@ -122,6 +122,10 @@ func (a *Application) Start(ctx context.Context) error {
 
 	logger.Logger.Info("Connection manager initialized")
 
+	a.ConnectionManager.InitiateActiveConnections(a.Context)
+
+	logger.Logger.Info("Connected to all active shards")
+
 	//API Server
 	logger.Logger.Info("Initializing application server")
 

@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"context"
+	"database/sql"
 
 	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/repository"
@@ -119,7 +120,7 @@ func (s *NodeConnectionService) GetConnectionByNodeID(
 		return conn, nil
 	}
 
-	conn, err := s.repo.GetConnectionByNodeId(
+	node, err := s.nodeRepo.NodeGetByID(
 		ctx,
 		nodeID,
 	)
@@ -127,7 +128,17 @@ func (s *NodeConnectionService) GetConnectionByNodeID(
 		return repository.NodeConnection{}, err
 	}
 
-	s.cache.Connections.Set(conn)
+	if err := s.refresher.RefreshConnections(
+		ctx,
+		node.ProjectID,
+	); err != nil {
+		return repository.NodeConnection{}, err
+	}
+
+	conn, ok := s.cache.Connections.Get(nodeID)
+	if !ok {
+		return repository.NodeConnection{}, sql.ErrNoRows
+	}
 
 	return conn, nil
 }

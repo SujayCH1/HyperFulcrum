@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"context"
+	"database/sql"
 
 	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/repository"
@@ -41,7 +42,9 @@ func (s *ProjectService) CreateProject(
 		return repository.Project{}, err
 	}
 
-	s.cache.Projects.Set(project)
+	if err := s.refresher.RefreshProjects(ctx); err != nil {
+		return repository.Project{}, err
+	}
 
 	return project, nil
 }
@@ -50,16 +53,17 @@ func (s *ProjectService) ListProjects(
 	ctx context.Context,
 ) ([]repository.Project, error) {
 
-	projects, err := s.repo.ProjectList(ctx)
-	if err != nil {
+	projects := s.cache.Projects.GetAll()
+
+	if len(projects) > 0 {
+		return projects, nil
+	}
+
+	if err := s.refresher.RefreshProjects(ctx); err != nil {
 		return nil, err
 	}
 
-	for _, project := range projects {
-		s.cache.Projects.Set(project)
-	}
-
-	return projects, nil
+	return s.cache.Projects.GetAll(), nil
 }
 
 func (s *ProjectService) GetProjectByID(
@@ -67,19 +71,22 @@ func (s *ProjectService) GetProjectByID(
 	projectID string,
 ) (repository.Project, error) {
 
-	if project, ok := s.cache.Projects.Get(projectID); ok {
+	project, ok := s.cache.Projects.Get(projectID)
+	if ok {
 		return project, nil
 	}
 
-	project, err := s.repo.ProjectGetByID(
+	if err := s.refresher.RefreshProject(
 		ctx,
 		projectID,
-	)
-	if err != nil {
+	); err != nil {
 		return repository.Project{}, err
 	}
 
-	s.cache.Projects.Set(project)
+	project, ok = s.cache.Projects.Get(projectID)
+	if !ok {
+		return repository.Project{}, sql.ErrNoRows
+	}
 
 	return project, nil
 }
@@ -97,9 +104,7 @@ func (s *ProjectService) DeleteProject(
 		return err
 	}
 
-	s.cache.Projects.Delete(projectID)
-
-	return nil
+	return s.refresher.RefreshProjects(ctx)
 }
 
 func (s *ProjectService) GetReadyProjects(

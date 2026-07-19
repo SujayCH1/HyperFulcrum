@@ -2,6 +2,8 @@ package cache
 
 import (
 	"context"
+	"database/sql"
+
 	"hyperfulcrum/internal/repository"
 )
 
@@ -55,13 +57,40 @@ func (r *CacheRefresher) RefreshProjectMetadata(
 	return nil
 }
 
+func (r *CacheRefresher) RefreshProjects(
+	ctx context.Context,
+) error {
+
+	projects, err := r.projectRepo.ProjectList(ctx)
+	if err != nil {
+		return err
+	}
+
+	r.cache.Projects.Clear()
+
+	for _, project := range projects {
+		r.cache.Projects.Set(project)
+	}
+
+	return nil
+}
+
 func (r *CacheRefresher) RefreshProject(
 	ctx context.Context,
 	projectID string,
 ) error {
 
-	project, err := r.projectRepo.ProjectGetByID(ctx, projectID)
+	project, err := r.projectRepo.ProjectGetByID(
+		ctx,
+		projectID,
+	)
 	if err != nil {
+
+		if err == sql.ErrNoRows {
+			r.cache.Projects.Delete(projectID)
+			return nil
+		}
+
 		return err
 	}
 
@@ -75,18 +104,20 @@ func (r *CacheRefresher) RefreshNodes(
 	projectID string,
 ) error {
 
-	nodes, err := r.nodeRepo.NodesGetByPorjectID(ctx, projectID)
+	nodes, err := r.nodeRepo.NodeList(
+		ctx,
+		projectID,
+	)
 	if err != nil {
 		return err
 	}
 
-	r.cache.ProjectNodes.Delete(projectID)
+	for _, node := range nodes {
+		r.cache.Nodes.Delete(node.ID)
+	}
 
 	for _, node := range nodes {
-
 		r.cache.Nodes.Set(node)
-
-		r.cache.ProjectNodes.Add(projectID, node.ID)
 	}
 
 	return nil
@@ -97,9 +128,16 @@ func (r *CacheRefresher) RefreshConnections(
 	projectID string,
 ) error {
 
-	nodes, err := r.nodeRepo.NodesGetByPorjectID(ctx, projectID)
+	nodes, err := r.nodeRepo.NodeList(
+		ctx,
+		projectID,
+	)
 	if err != nil {
 		return err
+	}
+
+	for _, node := range nodes {
+		r.cache.Connections.Delete(node.ID)
 	}
 
 	for _, node := range nodes {
@@ -108,9 +146,11 @@ func (r *CacheRefresher) RefreshConnections(
 			ctx,
 			node.ID,
 		)
-
 		if err != nil {
-			continue
+			if err == sql.ErrNoRows {
+				continue
+			}
+			return err
 		}
 
 		r.cache.Connections.Set(conn)
@@ -124,7 +164,7 @@ func (r *CacheRefresher) RefreshTopology(
 	projectID string,
 ) error {
 
-	topology, err := r.topologyRepo.TopologyGetAll(
+	topologies, err := r.topologyRepo.TopologyGetAll(
 		ctx,
 		projectID,
 	)
@@ -132,7 +172,10 @@ func (r *CacheRefresher) RefreshTopology(
 		return err
 	}
 
-	r.cache.Topology.Set(projectID, topology)
+	r.cache.Topology.Set(
+		projectID,
+		topologies,
+	)
 
 	return nil
 }
@@ -146,14 +189,30 @@ func (r *CacheRefresher) RefreshAllProjects(
 		return err
 	}
 
+	r.cache.Projects.Clear()
+
 	for _, project := range projects {
 
-		err := r.RefreshProjectMetadata(
+		r.cache.Projects.Set(project)
+
+		if err := r.RefreshNodes(
 			ctx,
 			project.ID,
-		)
+		); err != nil {
+			return err
+		}
 
-		if err != nil {
+		if err := r.RefreshConnections(
+			ctx,
+			project.ID,
+		); err != nil {
+			return err
+		}
+
+		if err := r.RefreshTopology(
+			ctx,
+			project.ID,
+		); err != nil {
 			return err
 		}
 	}
