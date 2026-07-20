@@ -28,11 +28,20 @@ func NewNodeRepository(connConfig *sql.DB) *NodeRepository {
 
 // Main functions
 
-func (r *NodeRepository) NodeList(ctx context.Context, projectID string) ([]Node, error) {
+func (r *NodeRepository) NodeList(
+	ctx context.Context,
+	projectID string,
+) ([]Node, error) {
 
 	query := `
 		SELECT
-		id, project_id, node_name, node_index, node_status, node_type, created_at
+			id,
+			project_id,
+			node_name,
+			node_index,
+			node_status,
+			node_type,
+			created_at
 		FROM nodes
 		WHERE project_id = $1
 	`
@@ -50,7 +59,9 @@ func (r *NodeRepository) NodeList(ctx context.Context, projectID string) ([]Node
 	nodes := make([]Node, 0)
 
 	for rows.Next() {
+
 		var node Node
+
 		err = rows.Scan(
 			&node.ID,
 			&node.ProjectID,
@@ -67,8 +78,11 @@ func (r *NodeRepository) NodeList(ctx context.Context, projectID string) ([]Node
 		nodes = append(nodes, node)
 	}
 
-	return nodes, nil
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
+	return nodes, nil
 }
 
 func (r *NodeRepository) NodeAdd(ctx context.Context, projectID string, nodeType string, nodeName string) error {
@@ -109,14 +123,17 @@ func (r *NodeRepository) NodeAdd(ctx context.Context, projectID string, nodeType
 
 }
 
-func (r *NodeRepository) NodeRemove(ctx context.Context, nodeID string) error {
+func (r *NodeRepository) NodeRemove(
+	ctx context.Context,
+	nodeID string,
+) error {
 
 	query := `
 		DELETE FROM nodes
 		WHERE id = $1
 	`
 
-	_, err := r.conn.ExecContext(
+	res, err := r.conn.ExecContext(
 		ctx,
 		query,
 		nodeID,
@@ -125,8 +142,16 @@ func (r *NodeRepository) NodeRemove(ctx context.Context, nodeID string) error {
 		return err
 	}
 
-	return nil
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
 
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }
 
 func (r *NodeRepository) NodeRemoveAll(ctx context.Context, projectID string) error {
@@ -169,14 +194,19 @@ func (r *NodeRepository) NodeUpdateName(ctx context.Context, nodeID string, name
 	return nil
 }
 
-func (r *NodeRepository) NodeUpdateStatus(ctx context.Context, nodeID string, status bool) error {
+func (r *NodeRepository) NodeUpdateStatus(
+	ctx context.Context,
+	nodeID string,
+	status bool,
+) error {
+
 	query := `
 		UPDATE nodes
 		SET node_status = $1
 		WHERE id = $2
 	`
 
-	_, err := r.conn.ExecContext(
+	res, err := r.conn.ExecContext(
 		ctx,
 		query,
 		status,
@@ -186,10 +216,24 @@ func (r *NodeRepository) NodeUpdateStatus(ctx context.Context, nodeID string, st
 		return err
 	}
 
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
 	return nil
 }
 
-func (r *NodeRepository) NodeUpdateType(ctx context.Context, nodeID string, nodeType string) error {
+func (r *NodeRepository) NodeUpdateType(
+	ctx context.Context,
+	nodeID string,
+	nodeType string,
+) error {
+
 	if nodeType != "shard" && nodeType != "replica" {
 		return fmt.Errorf("invalid node type: %s", nodeType)
 	}
@@ -200,7 +244,7 @@ func (r *NodeRepository) NodeUpdateType(ctx context.Context, nodeID string, node
 		WHERE id = $2
 	`
 
-	_, err := r.conn.ExecContext(
+	res, err := r.conn.ExecContext(
 		ctx,
 		query,
 		nodeType,
@@ -210,48 +254,91 @@ func (r *NodeRepository) NodeUpdateType(ctx context.Context, nodeID string, node
 		return err
 	}
 
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
 	return nil
 }
 
-func (r *NodeRepository) NodesGetByPorjectID(ctx context.Context, projectID string) ([]Node, error) {
+// func (r *NodeRepository) NodesGetByPorjectID(ctx context.Context, projectID string) ([]Node, error) {
+
+// 	query := `
+// 		SELECT
+// 		id, project_id, node_name, node_index, node_status, node_type, created_at
+// 		FROM nodes
+// 		WHERE project_id = $1
+// 	`
+
+// 	rows, err := r.conn.QueryContext(
+// 		ctx,
+// 		query,
+// 		projectID,
+// 	)
+// 	if err != nil {
+// 		return []Node{}, err
+// 	}
+
+// 	var nodes []Node
+// 	var node Node
+
+// 	for rows.Next() {
+// 		err := rows.Scan(
+// 			&node.ID,
+// 			&node.ProjectID,
+// 			&node.Name,
+// 			&node.Index,
+// 			&node.Status,
+// 			&node.Type,
+// 			&node.CreatedAt,
+// 		)
+// 		if err != nil {
+// 			return []Node{}, err
+// 		}
+
+// 		nodes = append(nodes, node)
+// 	}
+
+// 	return nodes, nil
+
+// }
+
+func (r *NodeRepository) NodeGetByID(ctx context.Context, nodeID string) (Node, error) {
 
 	query := `
 		SELECT 
-		id, project_id, node_name, node__index, node_status, node_type, created_at
+		id, project_id, node_name, node_index, node_status, node_type, created_at
 		FROM nodes
-		WHERE project_id = $1
+		WHERE id = $1
 	`
 
-	rows, err := r.conn.QueryContext(
+	row := r.conn.QueryRowContext(
 		ctx,
 		query,
-		projectID,
+		nodeID,
 	)
-	if err != nil {
-		return []Node{}, err
-	}
 
-	var nodes []Node
 	var node Node
 
-	for rows.Next() {
-		err := rows.Scan(
-			&node.ID,
-			&node.ProjectID,
-			&node.Name,
-			&node.Index,
-			&node.Status,
-			&node.Type,
-			&node.CreatedAt,
-		)
-		if err != nil {
-			return []Node{}, err
-		}
-
-		nodes = append(nodes, node)
+	err := row.Scan(
+		&node.ID,
+		&node.ProjectID,
+		&node.Name,
+		&node.Index,
+		&node.Status,
+		&node.Type,
+		&node.CreatedAt,
+	)
+	if err != nil {
+		return Node{}, err
 	}
 
-	return nodes, nil
+	return node, nil
 
 }
 
