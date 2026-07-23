@@ -32,7 +32,7 @@ func (r *NodeTopologyRepository) TopologyAdd(
 	projectID string,
 	shardID string,
 	replicaID string,
-) error {
+) (NodeTopology, error) {
 
 	query := `
 		INSERT INTO node_topology
@@ -45,19 +45,33 @@ func (r *NodeTopologyRepository) TopologyAdd(
 		)
 		VALUES
 		($1, $2, $3, $4, $5)
+
 	`
+
+	newUUID := uuid.New().String()
+	currTime := time.Now()
 
 	_, err := r.conn.ExecContext(
 		ctx,
 		query,
-		uuid.New(),
+		newUUID,
 		projectID,
 		shardID,
 		replicaID,
-		time.Now(),
+		currTime,
 	)
+	if err != nil {
+		return NodeTopology{}, err
+	}
 
-	return err
+	return NodeTopology{
+		RelationID:    string(newUUID),
+		ProjectID:     projectID,
+		ShardNodeID:   shardID,
+		ReplicaNodeID: replicaID,
+		CreatedAt:     currTime,
+	}, err
+
 }
 
 func (r *NodeTopologyRepository) TopologyRemove(

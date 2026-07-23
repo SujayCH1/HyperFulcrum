@@ -33,11 +33,13 @@ type Application struct {
 	ProjectService        *metadata.ProjectService
 	NodeService           *metadata.NodeService
 	NodeConnectionService *metadata.NodeConnectionService
+	NodeTopologyService   *metadata.TopologyService
 
 	// handlers
 	ProjectHandler        *handlers.ProjectHandler
 	NodeHandler           *handlers.NodeHandler
 	NodeConnectionHandler *handlers.NodeConnectionHandler
+	NodeTopologyHandler   *handlers.TopologyHandler
 
 	// connection pool
 	ConnectionStore   *connections.ConnectionStore
@@ -149,6 +151,12 @@ func (a *Application) Start(ctx context.Context) error {
 		a.CacheRefresher,
 	)
 
+	a.NodeTopologyService = metadata.NewTpologyService(
+		a.TopologyRepo,
+		a.CacheManager,
+		a.CacheRefresher,
+	)
+
 	// handlers
 	a.ProjectHandler = handlers.NewProjectHandler(
 		a.ProjectService,
@@ -162,11 +170,16 @@ func (a *Application) Start(ctx context.Context) error {
 		a.NodeConnectionService,
 	)
 
+	a.NodeTopologyHandler = handlers.NewTopoogyHandler(
+		a.NodeTopologyService,
+	)
+
 	// server setup
 	a.Server = router.NewRouter(
 		a.ProjectHandler,
 		a.NodeHandler,
 		a.NodeConnectionHandler,
+		a.NodeTopologyHandler,
 	)
 
 	handler := middleware.CORS(a.Server)
