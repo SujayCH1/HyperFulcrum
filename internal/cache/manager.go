@@ -5,6 +5,9 @@ type CacheManager struct {
 	Nodes       *NodeStore
 	Connections *ConnectionStore
 	Topology    *NodeTopologyStore
+
+	Columns *ColumnStore
+	FKEdges *FKEdgesStore
 }
 
 func NewCacheManager() *CacheManager {
@@ -13,5 +16,8 @@ func NewCacheManager() *CacheManager {
 		Nodes:       NewNodeStore(),
 		Connections: NewConnectionStore(),
 		Topology:    NewTopologyStore(),
+
+		Columns: NewColumnStore(),
+		FKEdges: NewFKEdgesStore(),
 	}
 }

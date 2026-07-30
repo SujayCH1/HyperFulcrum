@@ -2,62 +2,86 @@ package schema
 
 import (
 	"context"
-	"hyperfulcrum/internal/repository"
+
+	"hyperfulcrum/internal/metadata"
+	"hyperfulcrum/internal/parser/ir"
 )
 
 type SchemaService struct {
-	columnRepo  *repository.ColumnRepository
-	fkEdgesRepo *repository.FKEdgesRepository
+	columnService *metadata.ColumnService
+	fkEdgeService *metadata.FKEdgesService
 }
 
-func NewSchemaService(columnRepo *repository.ColumnRepository, fkEdgesRepo *repository.FKEdgesRepository) *SchemaService {
+func NewSchemaService(
+	columnService *metadata.ColumnService,
+	fkEdgeService *metadata.FKEdgesService,
+) *SchemaService {
+
 	return &SchemaService{
-		columnRepo:  columnRepo,
-		fkEdgesRepo: fkEdgesRepo,
+		columnService: columnService,
+		fkEdgeService: fkEdgeService,
 	}
 }
 
-func (s *SchemaService) ApplyDDL(ctx context.Context, projectID string,
-	ddl string) error {
+// ApplyDDL updates the project's logical schema metadata by replaying a batch
+// of parsed DDL statements.
+func (s *SchemaService) ApplyDDL(
+	ctx context.Context,
+	projectID string,
+	batch *ir.Batch,
+) error {
 
-	//build schema from incoming ddl
-	deltaSchema, err := BuildLogicalSchemaFromDDL(ddl)
-	if err != nil {
-		return err
-	}
-	//build schema from existing metadata stored
-	columns, err := s.columnRepo.ColumnsListByProjectID(ctx, projectID)
-	if err != nil {
-		return err
-	}
-	fkEdges, err := s.fkEdgesRepo.EdgesListByProjectID(ctx, projectID)
-	if err != nil {
-		return err
-	}
-
-	baseSchema, err := BuildLogicalSchemaFromMetaData(projectID, columns, fkEdges)
+	// Load current metadata.
+	columns, err := s.columnService.ListColumns(
+		ctx,
+		projectID,
+	)
 	if err != nil {
 		return err
 	}
 
-	//merge both schema
-	mergedSchema, err := MergeLogicalSchema(baseSchema, deltaSchema)
+	fkEdges, err := s.fkEdgeService.ListEdges(
+		ctx,
+		projectID,
+	)
 	if err != nil {
 		return err
 	}
 
-	newColumns, newFKEdges, err := FlattenLogicalSchema(mergedSchema)
+	// Build logical schema.
+	schema, err := BuildLogicalSchemaFromMetadata(
+		projectID,
+		columns,
+		fkEdges,
+	)
 	if err != nil {
 		return err
 	}
 
-	//save to db
-	if err := s.columnRepo.ColumnReplace(ctx, projectID, newColumns); err != nil {
+	// Replay the parsed DDL.
+	if err := ApplyBatch(schema, batch); err != nil {
 		return err
 	}
 
-	if err := s.fkEdgesRepo.FKEdgesReplaceForProject(ctx, projectID, newFKEdges); err != nil {
+	// Flatten back into metadata.
+	updatedColumns, updatedEdges := FlattenLogicalSchema(schema)
+
+	// Persist.
+	if err := s.columnService.ReplaceColumns(
+		ctx,
+		projectID,
+		updatedColumns,
+	); err != nil {
 		return err
 	}
+
+	if err := s.fkEdgeService.ReplaceEdges(
+		ctx,
+		projectID,
+		updatedEdges,
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
