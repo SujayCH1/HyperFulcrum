@@ -7,58 +7,150 @@ import (
 )
 
 type ColumnStore struct {
-	mu   sync.RWMutex
-	data map[string]repository.Column
+	mu sync.RWMutex
+
+	// projectID -> columnKey -> Column
+	data map[string]map[string]repository.Column
 }
 
 func NewColumnStore() *ColumnStore {
 	return &ColumnStore{
-		data: make(map[string]repository.Column),
+		data: make(map[string]map[string]repository.Column),
 	}
 }
 
-func columnKey(c repository.Column) string {
-	return c.ProjectID + ":" + c.TableName + ":" + c.ColumnName
+func columnKey(tableName, columnName string) string {
+	return tableName + ":" + columnName
 }
 
 func (s *ColumnStore) Set(col repository.Column) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.data[columnKey(col)] = col
+	if _, ok := s.data[col.ProjectID]; !ok {
+		s.data[col.ProjectID] = make(map[string]repository.Column)
+	}
+
+	s.data[col.ProjectID][columnKey(col.TableName, col.ColumnName)] = col
 }
 
-func (s *ColumnStore) GetAll() []repository.Column {
+func (s *ColumnStore) Get(
+	projectID,
+	tableName,
+	columnName string,
+) (repository.Column, bool) {
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	cols := make([]repository.Column, 0, len(s.data))
-
-	for _, c := range s.data {
-		cols = append(cols, c)
+	projectColumns, ok := s.data[projectID]
+	if !ok {
+		return repository.Column{}, false
 	}
 
-	return cols
+	col, ok := projectColumns[columnKey(tableName, columnName)]
+	return col, ok
+}
+
+func (s *ColumnStore) GetByProject(
+	projectID string,
+) []repository.Column {
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	projectColumns, ok := s.data[projectID]
+	if !ok {
+		return nil
+	}
+
+	columns := make([]repository.Column, 0, len(projectColumns))
+
+	for _, col := range projectColumns {
+		columns = append(columns, col)
+	}
+
+	return columns
+}
+
+func (s *ColumnStore) GetByTable(
+	projectID,
+	tableName string,
+) []repository.Column {
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	projectColumns, ok := s.data[projectID]
+	if !ok {
+		return nil
+	}
+
+	columns := make([]repository.Column, 0)
+
+	for _, col := range projectColumns {
+		if col.TableName == tableName {
+			columns = append(columns, col)
+		}
+	}
+
+	return columns
 }
 
 func (s *ColumnStore) Delete(col repository.Column) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	delete(s.data, columnKey(col))
+	projectColumns, ok := s.data[col.ProjectID]
+	if !ok {
+		return
+	}
+
+	delete(projectColumns, columnKey(col.TableName, col.ColumnName))
+
+	if len(projectColumns) == 0 {
+		delete(s.data, col.ProjectID)
+	}
+}
+
+func (s *ColumnStore) DeleteProject(projectID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.data, projectID)
 }
 
 func (s *ColumnStore) Exists(col repository.Column) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	_, ok := s.data[columnKey(col)]
+	projectColumns, ok := s.data[col.ProjectID]
+	if !ok {
+		return false
+	}
+
+	_, ok = projectColumns[columnKey(col.TableName, col.ColumnName)]
 	return ok
+}
+
+func (s *ColumnStore) GetAll() []repository.Column {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var columns []repository.Column
+
+	for _, projectColumns := range s.data {
+		for _, col := range projectColumns {
+			columns = append(columns, col)
+		}
+	}
+
+	return columns
 }
 
 func (s *ColumnStore) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.data = make(map[string]repository.Column)
+	s.data = make(map[string]map[string]repository.Column)
 }

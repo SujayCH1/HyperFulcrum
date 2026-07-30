@@ -51,18 +51,9 @@ func (s *FKEdgesService) ListEdges(
 	projectID string,
 ) ([]repository.FkEdges, error) {
 
-	cachedEdges := s.cache.FKEdges.GetAll()
-
-	var result []repository.FkEdges
-
-	for _, edge := range cachedEdges {
-		if edge.ProjectId == projectID {
-			result = append(result, edge)
-		}
-	}
-
-	if len(result) > 0 {
-		return result, nil
+	edges := s.cache.FKEdges.GetByProject(projectID)
+	if len(edges) > 0 {
+		return edges, nil
 	}
 
 	if err := s.refresher.RefreshFKEdges(
@@ -72,17 +63,9 @@ func (s *FKEdgesService) ListEdges(
 		return nil, err
 	}
 
-	cachedEdges = s.cache.FKEdges.GetAll()
+	edges = s.cache.FKEdges.GetByProject(projectID)
 
-	result = nil
-
-	for _, edge := range cachedEdges {
-		if edge.ProjectId == projectID {
-			result = append(result, edge)
-		}
-	}
-
-	return result, nil
+	return edges, nil
 }
 
 func (s *FKEdgesService) ListByParentTable(
@@ -91,11 +74,34 @@ func (s *FKEdgesService) ListByParentTable(
 	tableName string,
 ) ([]repository.FkEdges, error) {
 
-	return s.repo.EdgesListByParentTable(
-		ctx,
+	edges := s.cache.FKEdges.GetByTable(
 		projectID,
 		tableName,
 	)
+
+	if len(edges) == 0 {
+		if err := s.refresher.RefreshFKEdges(
+			ctx,
+			projectID,
+		); err != nil {
+			return nil, err
+		}
+
+		edges = s.cache.FKEdges.GetByTable(
+			projectID,
+			tableName,
+		)
+	}
+
+	result := make([]repository.FkEdges, 0)
+
+	for _, edge := range edges {
+		if edge.ParentTable == tableName {
+			result = append(result, edge)
+		}
+	}
+
+	return result, nil
 }
 
 func (s *FKEdgesService) ListByChildTable(
@@ -104,9 +110,32 @@ func (s *FKEdgesService) ListByChildTable(
 	tableName string,
 ) ([]repository.FkEdges, error) {
 
-	return s.repo.EdgesListByChildTable(
-		ctx,
+	edges := s.cache.FKEdges.GetByTable(
 		projectID,
 		tableName,
 	)
+
+	if len(edges) == 0 {
+		if err := s.refresher.RefreshFKEdges(
+			ctx,
+			projectID,
+		); err != nil {
+			return nil, err
+		}
+
+		edges = s.cache.FKEdges.GetByTable(
+			projectID,
+			tableName,
+		)
+	}
+
+	result := make([]repository.FkEdges, 0)
+
+	for _, edge := range edges {
+		if edge.ChildTable == tableName {
+			result = append(result, edge)
+		}
+	}
+
+	return result, nil
 }
