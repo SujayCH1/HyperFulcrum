@@ -42,7 +42,6 @@ func (h *ProjectHandler) CreateProject(
 		payload.Name,
 		payload.Description,
 	)
-
 	if err != nil {
 		utils.WriteJSONErrorResponse(
 			w,

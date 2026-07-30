@@ -30,7 +30,7 @@ func (s *NodeTopologyStore) Set(
 	s.data[projectID] = copied
 }
 
-func (s *NodeTopologyStore) Get(
+func (s *NodeTopologyStore) GetByProjectID(
 	projectID string,
 ) ([]repository.NodeTopology, bool) {
 	s.mu.RLock()
@@ -60,14 +60,14 @@ func (s *NodeTopologyStore) GetAll() []repository.NodeTopology {
 	return result
 }
 
-func (s *NodeTopologyStore) Delete(projectID string) {
+func (s *NodeTopologyStore) DeleteByProjectID(projectID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	delete(s.data, projectID)
 }
 
-func (s *NodeTopologyStore) Exists(projectID string) bool {
+func (s *NodeTopologyStore) ExistsByProjectID(projectID string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

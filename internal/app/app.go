@@ -12,6 +12,7 @@ import (
 	"hyperfulcrum/internal/connections"
 	"hyperfulcrum/internal/database"
 	"hyperfulcrum/internal/metadata"
+	"hyperfulcrum/internal/replication"
 	"hyperfulcrum/internal/repository"
 	"hyperfulcrum/pkg/logger"
 	"net/http"
@@ -33,11 +34,19 @@ type Application struct {
 	ProjectService        *metadata.ProjectService
 	NodeService           *metadata.NodeService
 	NodeConnectionService *metadata.NodeConnectionService
+	NodeTopologyService   *metadata.TopologyService
+
+	// replication services
+	ReplicationService *replication.ReplicationService
 
 	// handlers
 	ProjectHandler        *handlers.ProjectHandler
 	NodeHandler           *handlers.NodeHandler
 	NodeConnectionHandler *handlers.NodeConnectionHandler
+	NodeTopologyHandler   *handlers.TopologyHandler
+
+	// replication handlers
+	ReplicationHandler *handlers.ReplicationHandler
 
 	// connection pool
 	ConnectionStore   *connections.ConnectionStore
@@ -149,6 +158,18 @@ func (a *Application) Start(ctx context.Context) error {
 		a.CacheRefresher,
 	)
 
+	a.NodeTopologyService = metadata.NewTpologyService(
+		a.TopologyRepo,
+		a.CacheManager,
+		a.CacheRefresher,
+	)
+
+	// replication services
+	a.ReplicationService = replication.NewReplicationService(
+		a.NodeTopologyService,
+		a.NodeService,
+	)
+
 	// handlers
 	a.ProjectHandler = handlers.NewProjectHandler(
 		a.ProjectService,
@@ -162,11 +183,21 @@ func (a *Application) Start(ctx context.Context) error {
 		a.NodeConnectionService,
 	)
 
+	a.NodeTopologyHandler = handlers.NewTopoogyHandler(
+		a.NodeTopologyService,
+	)
+
+	a.ReplicationHandler = handlers.NewReplicationHandler(
+		a.ReplicationService,
+	)
+
 	// server setup
 	a.Server = router.NewRouter(
 		a.ProjectHandler,
 		a.NodeHandler,
 		a.NodeConnectionHandler,
+		a.NodeTopologyHandler,
+		a.ReplicationHandler,
 	)
 
 	handler := middleware.CORS(a.Server)

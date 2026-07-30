@@ -3,6 +3,7 @@ package metadata
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/repository"
@@ -59,11 +60,7 @@ func (s *ProjectService) ListProjects(
 		return projects, nil
 	}
 
-	if err := s.refresher.RefreshProjects(ctx); err != nil {
-		return nil, err
-	}
-
-	return s.cache.Projects.GetAll(), nil
+	return []repository.Project{}, fmt.Errorf("No projectsfound")
 }
 
 func (s *ProjectService) GetProjectByID(
@@ -104,7 +101,9 @@ func (s *ProjectService) DeleteProject(
 		return err
 	}
 
-	return s.refresher.RefreshProjects(ctx)
+	s.refresher.RefreshProjects(ctx)
+
+	return nil
 }
 
 func (s *ProjectService) GetReadyProjects(
