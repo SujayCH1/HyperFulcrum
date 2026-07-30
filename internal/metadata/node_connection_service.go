@@ -120,17 +120,34 @@ func (s *NodeConnectionService) GetConnectionByNodeID(
 		return conn, nil
 	}
 
-	node, err := s.nodeRepo.NodeGetByID(
-		ctx,
-		nodeID,
-	)
-	if err != nil {
-		return repository.NodeConnection{}, err
+	projectID, ok := s.cache.Nodes.GetProjectID(nodeID)
+	if !ok {
+		node, err := s.nodeRepo.NodeGetByID(
+			ctx,
+			nodeID,
+		)
+		if err != nil {
+			return repository.NodeConnection{}, err
+		}
+
+		projectID = node.ProjectID
+
+		if err := s.refresher.RefreshNodes(
+			ctx,
+			projectID,
+		); err != nil {
+			return repository.NodeConnection{}, err
+		}
+
+		projectID, ok = s.cache.Nodes.GetProjectID(nodeID)
+		if !ok {
+			return repository.NodeConnection{}, sql.ErrNoRows
+		}
 	}
 
 	if err := s.refresher.RefreshConnections(
 		ctx,
-		node.ProjectID,
+		projectID,
 	); err != nil {
 		return repository.NodeConnection{}, err
 	}

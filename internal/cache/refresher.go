@@ -23,6 +23,8 @@ func NewCacheRefresher(
 	nodeRepo *repository.NodeRepository,
 	connectionRepo *repository.NodeConnectionRepository,
 	topologyRepo *repository.NodeTopologyRepository,
+	columnRepo *repository.ColumnRepository,
+	fkRepo *repository.FKEdgesRepository,
 	cache *CacheManager,
 ) *CacheRefresher {
 
@@ -31,6 +33,8 @@ func NewCacheRefresher(
 		nodeRepo:       nodeRepo,
 		connectionRepo: connectionRepo,
 		topologyRepo:   topologyRepo,
+		columnRepo:     columnRepo,
+		fkRepo:         fkRepo,
 		cache:          cache,
 	}
 }
@@ -53,6 +57,14 @@ func (r *CacheRefresher) RefreshProjectMetadata(
 	}
 
 	if err := r.RefreshTopology(ctx, projectID); err != nil {
+		return err
+	}
+
+	if err := r.RefreshColumns(ctx, projectID); err != nil {
+		return err
+	}
+
+	if err := r.RefreshFKEdges(ctx, projectID); err != nil {
 		return err
 	}
 
@@ -114,9 +126,7 @@ func (r *CacheRefresher) RefreshNodes(
 		return err
 	}
 
-	for _, node := range nodes {
-		r.cache.Nodes.Delete(node.ID)
-	}
+	r.cache.Nodes.DeleteProject(projectID)
 
 	for _, node := range nodes {
 		r.cache.Nodes.Set(node)
@@ -138,9 +148,7 @@ func (r *CacheRefresher) RefreshConnections(
 		return err
 	}
 
-	for _, node := range nodes {
-		r.cache.Connections.Delete(node.ID)
-	}
+	r.cache.Connections.DeleteProject(projectID)
 
 	for _, node := range nodes {
 
@@ -155,7 +163,10 @@ func (r *CacheRefresher) RefreshConnections(
 			return err
 		}
 
-		r.cache.Connections.Set(conn)
+		r.cache.Connections.Set(
+			projectID,
+			conn,
+		)
 	}
 
 	return nil
@@ -217,6 +228,20 @@ func (r *CacheRefresher) RefreshAllProjects(
 		); err != nil {
 			return err
 		}
+
+		if err := r.RefreshColumns(
+			ctx,
+			project.ID,
+		); err != nil {
+			return err
+		}
+
+		if err := r.RefreshFKEdges(
+			ctx,
+			project.ID,
+		); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -235,11 +260,7 @@ func (r *CacheRefresher) RefreshColumns(
 		return err
 	}
 
-	for _, col := range r.cache.Columns.GetAll() {
-		if col.ProjectID == projectID {
-			r.cache.Columns.Delete(col)
-		}
-	}
+	r.cache.Columns.DeleteProject(projectID)
 
 	for _, col := range columns {
 		r.cache.Columns.Set(col)
@@ -261,11 +282,7 @@ func (r *CacheRefresher) RefreshFKEdges(
 		return err
 	}
 
-	for _, edge := range r.cache.FKEdges.GetAll() {
-		if edge.ProjectId == projectID {
-			r.cache.FKEdges.Delete(edge)
-		}
-	}
+	r.cache.FKEdges.DeleteProject(projectID)
 
 	for _, edge := range edges {
 		r.cache.FKEdges.Set(edge)

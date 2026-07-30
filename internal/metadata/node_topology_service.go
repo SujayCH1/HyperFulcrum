@@ -78,9 +78,18 @@ func (s *TopologyService) ListTopologies(
 ) ([]repository.NodeTopology, error) {
 
 	topologies, ok := s.cache.Topology.GetByProjectID(projectID)
-	if !ok {
-		return nil, fmt.Errorf("topology not found")
+	if ok {
+		return topologies, nil
 	}
+
+	if err := s.refresher.RefreshTopology(
+		ctx,
+		projectID,
+	); err != nil {
+		return nil, err
+	}
+
+	topologies, _ = s.cache.Topology.GetByProjectID(projectID)
 
 	return topologies, nil
 }
@@ -92,8 +101,16 @@ func (s *TopologyService) GetTopologyByID(
 ) (repository.NodeTopology, error) {
 
 	topologies, ok := s.cache.Topology.GetByProjectID(projectID)
+
 	if !ok {
-		return repository.NodeTopology{}, fmt.Errorf("topology not found")
+		if err := s.refresher.RefreshTopology(
+			ctx,
+			projectID,
+		); err != nil {
+			return repository.NodeTopology{}, err
+		}
+
+		topologies, _ = s.cache.Topology.GetByProjectID(projectID)
 	}
 
 	for _, topology := range topologies {

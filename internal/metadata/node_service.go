@@ -54,18 +54,9 @@ func (s *NodeService) ListNodes(
 	projectID string,
 ) ([]repository.Node, error) {
 
-	cachedNodes := s.cache.Nodes.GetAll()
-
-	var projectNodes []repository.Node
-
-	for _, node := range cachedNodes {
-		if node.ProjectID == projectID {
-			projectNodes = append(projectNodes, node)
-		}
-	}
-
-	if len(projectNodes) > 0 {
-		return projectNodes, nil
+	nodes := s.cache.Nodes.GetByProject(projectID)
+	if len(nodes) > 0 {
+		return nodes, nil
 	}
 
 	if err := s.refresher.RefreshNodes(
@@ -75,17 +66,7 @@ func (s *NodeService) ListNodes(
 		return nil, err
 	}
 
-	cachedNodes = s.cache.Nodes.GetAll()
-
-	projectNodes = nil
-
-	for _, node := range cachedNodes {
-		if node.ProjectID == projectID {
-			projectNodes = append(projectNodes, node)
-		}
-	}
-
-	return projectNodes, nil
+	return s.cache.Nodes.GetByProject(projectID), nil
 }
 
 func (s *NodeService) RemoveNode(

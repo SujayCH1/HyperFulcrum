@@ -14,6 +14,7 @@ import (
 	"hyperfulcrum/internal/metadata"
 	"hyperfulcrum/internal/replication"
 	"hyperfulcrum/internal/repository"
+	"hyperfulcrum/internal/schema"
 	"hyperfulcrum/pkg/logger"
 	"net/http"
 )
@@ -29,15 +30,22 @@ type Application struct {
 	NodeRepo     *repository.NodeRepository
 	NodeConnRepo *repository.NodeConnectionRepository
 	TopologyRepo *repository.NodeTopologyRepository
+	ColumnRepo   *repository.ColumnRepository
+	FKEdgesRepo  *repository.FKEdgesRepository
 
 	// metadata services
 	ProjectService        *metadata.ProjectService
 	NodeService           *metadata.NodeService
 	NodeConnectionService *metadata.NodeConnectionService
 	NodeTopologyService   *metadata.TopologyService
+	ColumnService         *metadata.ColumnService
+	FKEdgesService        *metadata.FKEdgesService
 
 	// replication services
 	ReplicationService *replication.ReplicationService
+
+	// schema service
+	SchemaService *schema.SchemaService
 
 	// handlers
 	ProjectHandler        *handlers.ProjectHandler
@@ -92,6 +100,8 @@ func (a *Application) Start(ctx context.Context) error {
 	a.NodeRepo = repository.NewNodeRepository(a.database)
 	a.NodeConnRepo = repository.NewNodeConnectionRepository(a.database)
 	a.TopologyRepo = repository.NewNodeTopologyRepo(a.database)
+	a.ColumnRepo = repository.NewColumnRepository(a.database)
+	a.FKEdgesRepo = repository.NewFKEdgesRepository(a.database)
 
 	logger.Logger.Info("Repositories initialized")
 
@@ -105,6 +115,8 @@ func (a *Application) Start(ctx context.Context) error {
 		a.NodeRepo,
 		a.NodeConnRepo,
 		a.TopologyRepo,
+		a.ColumnRepo,
+		a.FKEdgesRepo,
 		a.CacheManager,
 	)
 
@@ -131,7 +143,9 @@ func (a *Application) Start(ctx context.Context) error {
 
 	logger.Logger.Info("Connection manager initialized")
 
-	a.ConnectionManager.InitiateActiveConnections(a.Context)
+	if err := a.ConnectionManager.InitiateActiveConnections(ctx); err != nil {
+		return fmt.Errorf("initialize active connections: %w", err)
+	}
 
 	logger.Logger.Info("Connected to all active shards")
 
@@ -139,6 +153,8 @@ func (a *Application) Start(ctx context.Context) error {
 	logger.Logger.Info("Initializing application server")
 
 	// metadata services
+	logger.Logger.Info("Initializing metadata services")
+
 	a.ProjectService = metadata.NewProjectService(
 		a.ProjectRepo,
 		a.CacheManager,
@@ -164,11 +180,40 @@ func (a *Application) Start(ctx context.Context) error {
 		a.CacheRefresher,
 	)
 
+	a.ColumnService = metadata.NewColumnService(
+		a.ColumnRepo,
+		a.CacheManager,
+		a.CacheRefresher,
+	)
+
+	a.FKEdgesService = metadata.NewFKEdgesService(
+		a.FKEdgesRepo,
+		a.CacheManager,
+		a.CacheRefresher,
+	)
+
+	logger.Logger.Info("Initialized metadata services")
+
+	// MAJOR SERVICES
 	// replication services
+	logger.Logger.Info("Initializing replication service")
+
 	a.ReplicationService = replication.NewReplicationService(
 		a.NodeTopologyService,
 		a.NodeService,
 	)
+
+	logger.Logger.Info("Replication service initialized")
+
+	//schema service
+	logger.Logger.Info("Initializing schema service")
+
+	a.SchemaService = schema.NewSchemaService(
+		a.ColumnService,
+		a.FKEdgesService,
+	)
+
+	logger.Logger.Info("Schema service initialized")
 
 	// handlers
 	a.ProjectHandler = handlers.NewProjectHandler(

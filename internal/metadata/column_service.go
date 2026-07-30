@@ -51,18 +51,9 @@ func (s *ColumnService) ListColumns(
 	projectID string,
 ) ([]repository.Column, error) {
 
-	cachedColumns := s.cache.Columns.GetAll()
-
-	var result []repository.Column
-
-	for _, column := range cachedColumns {
-		if column.ProjectID == projectID {
-			result = append(result, column)
-		}
-	}
-
-	if len(result) > 0 {
-		return result, nil
+	columns := s.cache.Columns.GetByProject(projectID)
+	if len(columns) > 0 {
+		return columns, nil
 	}
 
 	if err := s.refresher.RefreshColumns(
@@ -72,15 +63,7 @@ func (s *ColumnService) ListColumns(
 		return nil, err
 	}
 
-	cachedColumns = s.cache.Columns.GetAll()
+	columns = s.cache.Columns.GetByProject(projectID)
 
-	result = nil
-
-	for _, column := range cachedColumns {
-		if column.ProjectID == projectID {
-			result = append(result, column)
-		}
-	}
-
-	return result, nil
+	return columns, nil
 }
