@@ -1,37 +1,46 @@
 package schema
 
+import "hyperfulcrum/internal/parser/ir"
+
 type LogicalSchema struct {
 	ProjectID string
-	Tables    map[string]*Table
+	Tables    map[string]*LogicalTable
 }
 
-type Table struct {
-	Columns map[string]*Column
-	Fks     map[Fkkey]*Fk
-}
+type LogicalTable struct {
+	Name string
 
-type Column struct {
-	Name     string
-	DataType string
-	Nullable bool
-	IsPk     bool
-}
+	Columns map[string]*ir.Column
 
-type Fkkey struct {
-	ChildColumn  string
-	ParentTable  string
-	ParentColumn string
-}
+	// Key = constraint.Name
+	Constraints map[string]*ir.Constraint
 
-type Fk struct {
-	ChildTable   string
-	ParentTable  string
-	ChildColumn  string
-	ParentColumn string
+	Indexes map[string]*ir.Index
 }
 
 func NewLogicalSchema() *LogicalSchema {
 	return &LogicalSchema{
-		Tables: make(map[string]*Table),
+		Tables: make(map[string]*LogicalTable),
 	}
+}
+
+func NewLogicalTable(name string) *LogicalTable {
+	return &LogicalTable{
+		Name:        name,
+		Columns:     make(map[string]*ir.Column),
+		Constraints: make(map[string]*ir.Constraint),
+		Indexes:     make(map[string]*ir.Index),
+	}
+}
+
+func (s *LogicalSchema) EnsureTable(name string) *LogicalTable {
+	table, ok := s.Tables[name]
+	if ok {
+		return table
+	}
+
+	table = NewLogicalTable(name)
+	s.Tables[name] = table
+
+	return table
 }

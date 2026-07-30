@@ -1,36 +1,93 @@
 package schema
 
-import "hyperfulcrum/internal/repository"
+import (
+	"hyperfulcrum/internal/parser/ir"
+	"hyperfulcrum/internal/repository"
+)
 
-func FlattenColumn(schema *LogicalSchema) []repository.Column {
-	var cols []repository.Column
+func FlattenLogicalSchema(
+	schema *LogicalSchema,
+) (
+	[]repository.Column,
+	[]repository.FkEdges,
+) {
+
+	return flattenColumns(schema), flattenFKEdges(schema)
+}
+
+func flattenColumns(
+	schema *LogicalSchema,
+) []repository.Column {
+
+	var columns []repository.Column
+
 	for tableName, table := range schema.Tables {
+
+		primaryKeys := make(map[string]struct{})
+
+		for _, constraint := range table.Constraints {
+
+			if constraint.Type != ir.PrimaryKey {
+				continue
+			}
+
+			for _, column := range constraint.Columns {
+				primaryKeys[column] = struct{}{}
+			}
+		}
+
 		for _, column := range table.Columns {
-			cols = append(cols, repository.Column{
+
+			_, isPrimaryKey := primaryKeys[column.Name]
+
+			columns = append(columns, repository.Column{
 				ProjectID:  schema.ProjectID,
 				TableName:  tableName,
 				ColumnName: column.Name,
-				DataType:   column.DataType,
+				DataType:   column.DataType.Name,
 				IsNullable: column.Nullable,
-				IsPk:      column.IsPk,
+				IsPk:       isPrimaryKey,
 			})
 		}
 	}
-	return cols
+
+	return columns
 }
 
-func FlattenFKEdges(schema *LogicalSchema) []repository.FkEdges {
-	var fks []repository.FkEdges
+func flattenFKEdges(
+	schema *LogicalSchema,
+) []repository.FkEdges {
+
+	var edges []repository.FkEdges
+
 	for tableName, table := range schema.Tables {
-		for _, fk := range table.Fks {
-			fks = append(fks, repository.FkEdges{
-				ProjectId:    schema.ProjectID,
-				ParentTable:  fk.ParentTable,
-				ParentColumn: fk.ParentColumn,
-				ChildTable:   tableName,
-				ChildColumn:  fk.ChildColumn,
-			})
+
+		for _, constraint := range table.Constraints {
+
+			if constraint.Type != ir.ForeignKey {
+				continue
+			}
+
+			if constraint.Reference == nil {
+				continue
+			}
+
+			for i, childColumn := range constraint.Columns {
+
+				if i >= len(constraint.Reference.Columns) {
+					break
+				}
+
+				edges = append(edges, repository.FkEdges{
+					ProjectId:    schema.ProjectID,
+					ParentTable:  constraint.Reference.Table,
+					ParentColumn: constraint.Reference.Columns[i],
+					ChildTable:   tableName,
+					ChildColumn:  childColumn,
+				})
+			}
 		}
 	}
-	return fks
+
+	return edges
 }

@@ -12,6 +12,8 @@ type CacheRefresher struct {
 	nodeRepo       *repository.NodeRepository
 	connectionRepo *repository.NodeConnectionRepository
 	topologyRepo   *repository.NodeTopologyRepository
+	columnRepo     *repository.ColumnRepository
+	fkRepo         *repository.FKEdgesRepository
 
 	cache *CacheManager
 }
@@ -215,6 +217,58 @@ func (r *CacheRefresher) RefreshAllProjects(
 		); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (r *CacheRefresher) RefreshColumns(
+	ctx context.Context,
+	projectID string,
+) error {
+
+	columns, err := r.columnRepo.ColumnsListByProjectID(
+		ctx,
+		projectID,
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, col := range r.cache.Columns.GetAll() {
+		if col.ProjectID == projectID {
+			r.cache.Columns.Delete(col)
+		}
+	}
+
+	for _, col := range columns {
+		r.cache.Columns.Set(col)
+	}
+
+	return nil
+}
+
+func (r *CacheRefresher) RefreshFKEdges(
+	ctx context.Context,
+	projectID string,
+) error {
+
+	edges, err := r.fkRepo.EdgesListByProjectID(
+		ctx,
+		projectID,
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, edge := range r.cache.FKEdges.GetAll() {
+		if edge.ProjectId == projectID {
+			r.cache.FKEdges.Delete(edge)
+		}
+	}
+
+	for _, edge := range edges {
+		r.cache.FKEdges.Set(edge)
 	}
 
 	return nil
