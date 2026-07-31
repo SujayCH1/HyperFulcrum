@@ -33,13 +33,21 @@ func (s *NodeService) AddNode(
 	name string,
 ) error {
 
-	err := s.repo.NodeAdd(
+	if err := s.validateAddNode(
 		ctx,
 		projectID,
 		nodeType,
 		name,
-	)
-	if err != nil {
+	); err != nil {
+		return err
+	}
+
+	if err := s.repo.NodeAdd(
+		ctx,
+		projectID,
+		nodeType,
+		name,
+	); err != nil {
 		return err
 	}
 
@@ -82,11 +90,17 @@ func (s *NodeService) RemoveNode(
 		return err
 	}
 
-	err = s.repo.NodeRemove(
+	if err := s.validateRemoveNode(
+		ctx,
+		node,
+	); err != nil {
+		return err
+	}
+
+	if err := s.repo.NodeRemove(
 		ctx,
 		nodeID,
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
@@ -110,12 +124,11 @@ func (s *NodeService) UpdateNodeName(
 		return err
 	}
 
-	err = s.repo.NodeUpdateName(
+	if err := s.repo.NodeUpdateName(
 		ctx,
 		nodeID,
 		name,
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
@@ -139,12 +152,19 @@ func (s *NodeService) UpdateNodeStatus(
 		return err
 	}
 
-	err = s.repo.NodeUpdateStatus(
+	if err := s.validateUpdateNodeStatus(
+		ctx,
+		node,
+		status,
+	); err != nil {
+		return err
+	}
+
+	if err := s.repo.NodeUpdateStatus(
 		ctx,
 		nodeID,
 		status,
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
@@ -168,12 +188,19 @@ func (s *NodeService) UpdateNodeType(
 		return err
 	}
 
-	err = s.repo.NodeUpdateType(
+	if err := s.validateUpdateNodeType(
+		ctx,
+		node,
+		nodeType,
+	); err != nil {
+		return err
+	}
+
+	if err := s.repo.NodeUpdateType(
 		ctx,
 		nodeID,
 		nodeType,
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 

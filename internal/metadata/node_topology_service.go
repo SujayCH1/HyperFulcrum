@@ -32,6 +32,15 @@ func (s *TopologyService) CreateTopology(
 	shardID string,
 ) (repository.NodeTopology, error) {
 
+	if err := s.validateCreateTopology(
+		ctx,
+		projectID,
+		replicaID,
+		shardID,
+	); err != nil {
+		return repository.NodeTopology{}, err
+	}
+
 	topology, err := s.repo.TopologyAdd(
 		ctx,
 		projectID,
@@ -42,12 +51,14 @@ func (s *TopologyService) CreateTopology(
 		return repository.NodeTopology{}, err
 	}
 
-	err = s.refresher.RefreshTopology(ctx, projectID)
-	if err != nil {
+	if err := s.refresher.RefreshTopology(
+		ctx,
+		projectID,
+	); err != nil {
 		return repository.NodeTopology{}, err
 	}
 
-	return topology, err
+	return topology, nil
 }
 
 func (s *TopologyService) DeleteTopology(
@@ -55,21 +66,34 @@ func (s *TopologyService) DeleteTopology(
 	relationID string,
 	projectID string,
 ) error {
-	err := s.repo.TopologyRemove(
+
+	topology, err := s.GetTopologyByID(
 		ctx,
+		projectID,
 		relationID,
 	)
 	if err != nil {
 		return err
 	}
 
-	err = s.refresher.RefreshTopology(ctx, projectID)
-	if err != nil {
+	if err := s.validateDeleteTopology(
+		ctx,
+		topology,
+	); err != nil {
 		return err
 	}
 
-	return nil
+	if err := s.repo.TopologyRemove(
+		ctx,
+		relationID,
+	); err != nil {
+		return err
+	}
 
+	return s.refresher.RefreshTopology(
+		ctx,
+		projectID,
+	)
 }
 
 func (s *TopologyService) ListTopologies(

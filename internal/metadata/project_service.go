@@ -96,6 +96,13 @@ func (s *ProjectService) DeleteProject(
 	projectID string,
 ) error {
 
+	if err := s.validateDeleteProject(
+		ctx,
+		projectID,
+	); err != nil {
+		return err
+	}
+
 	if err := s.repo.ProjectRemove(
 		ctx,
 		projectID,
@@ -112,3 +119,9 @@ func (s *ProjectService) GetReadyProjects(
 
 	return s.repo.ProjectGetReady(ctx)
 }
+
+// Remaining functions
+// ActivateProjecy()
+// DeactivateProject()
+// UpdateProject()
+// ArchiveProject()

@@ -35,11 +35,17 @@ func (s *NodeConnectionService) AddConnection(
 	connection *repository.NodeConnection,
 ) error {
 
-	err := s.repo.ConnectionAdd(
+	if err := s.validateAddConnection(
 		ctx,
 		connection,
-	)
-	if err != nil {
+	); err != nil {
+		return err
+	}
+
+	if err := s.repo.ConnectionAdd(
+		ctx,
+		connection,
+	); err != nil {
 		return err
 	}
 
@@ -70,11 +76,17 @@ func (s *NodeConnectionService) RemoveConnection(
 		return err
 	}
 
-	err = s.repo.ConnectionRemove(
+	if err := s.validateRemoveConnection(
+		ctx,
+		node,
+	); err != nil {
+		return err
+	}
+
+	if err := s.repo.ConnectionRemove(
 		ctx,
 		nodeID,
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
@@ -89,19 +101,26 @@ func (s *NodeConnectionService) UpdateConnection(
 	connection *repository.NodeConnection,
 ) error {
 
-	err := s.repo.ConnectionUpdate(
-		ctx,
-		connection,
-	)
-	if err != nil {
-		return err
-	}
-
 	node, err := s.nodeRepo.NodeGetByID(
 		ctx,
 		connection.NodeId,
 	)
 	if err != nil {
+		return err
+	}
+
+	if err := s.validateUpdateConnection(
+		ctx,
+		node,
+		connection,
+	); err != nil {
+		return err
+	}
+
+	if err := s.repo.ConnectionUpdate(
+		ctx,
+		connection,
+	); err != nil {
 		return err
 	}
 
