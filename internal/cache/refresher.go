@@ -8,12 +8,13 @@ import (
 )
 
 type CacheRefresher struct {
-	projectRepo    *repository.ProjectRepository
-	nodeRepo       *repository.NodeRepository
-	connectionRepo *repository.NodeConnectionRepository
-	topologyRepo   *repository.NodeTopologyRepository
-	columnRepo     *repository.ColumnRepository
-	fkRepo         *repository.FKEdgesRepository
+	projectRepo       *repository.ProjectRepository
+	nodeRepo          *repository.NodeRepository
+	connectionRepo    *repository.NodeConnectionRepository
+	topologyRepo      *repository.NodeTopologyRepository
+	columnRepo        *repository.ColumnRepository
+	fkRepo            *repository.FKEdgesRepository
+	schemaVersionRepo *repository.SchemaVersionRepository
 
 	cache *CacheManager
 }
@@ -25,17 +26,19 @@ func NewCacheRefresher(
 	topologyRepo *repository.NodeTopologyRepository,
 	columnRepo *repository.ColumnRepository,
 	fkRepo *repository.FKEdgesRepository,
+	schemaVersionRepo *repository.SchemaVersionRepository,
 	cache *CacheManager,
 ) *CacheRefresher {
 
 	return &CacheRefresher{
-		projectRepo:    projectRepo,
-		nodeRepo:       nodeRepo,
-		connectionRepo: connectionRepo,
-		topologyRepo:   topologyRepo,
-		columnRepo:     columnRepo,
-		fkRepo:         fkRepo,
-		cache:          cache,
+		projectRepo:       projectRepo,
+		nodeRepo:          nodeRepo,
+		connectionRepo:    connectionRepo,
+		topologyRepo:      topologyRepo,
+		columnRepo:        columnRepo,
+		fkRepo:            fkRepo,
+		schemaVersionRepo: schemaVersionRepo,
+		cache:             cache,
 	}
 }
 
@@ -287,6 +290,30 @@ func (r *CacheRefresher) RefreshFKEdges(
 	for _, edge := range edges {
 		r.cache.FKEdges.Set(edge)
 	}
+
+	return nil
+}
+
+func (r *CacheRefresher) RefreshSchemaVersion(
+	ctx context.Context,
+	projectID string,
+) error {
+
+	schema, err := r.schemaVersionRepo.FetchSchema(
+		ctx,
+		projectID,
+	)
+	if err != nil {
+
+		if err == sql.ErrNoRows {
+			r.cache.SchemaVersion.DeleteProject(projectID)
+			return nil
+		}
+
+		return err
+	}
+
+	r.cache.SchemaVersion.Set(schema)
 
 	return nil
 }

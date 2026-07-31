@@ -26,12 +26,13 @@ type Application struct {
 	database *sql.DB
 
 	// repositories
-	ProjectRepo  *repository.ProjectRepository
-	NodeRepo     *repository.NodeRepository
-	NodeConnRepo *repository.NodeConnectionRepository
-	TopologyRepo *repository.NodeTopologyRepository
-	ColumnRepo   *repository.ColumnRepository
-	FKEdgesRepo  *repository.FKEdgesRepository
+	ProjectRepo       *repository.ProjectRepository
+	NodeRepo          *repository.NodeRepository
+	NodeConnRepo      *repository.NodeConnectionRepository
+	TopologyRepo      *repository.NodeTopologyRepository
+	ColumnRepo        *repository.ColumnRepository
+	FKEdgesRepo       *repository.FKEdgesRepository
+	SchemaVersionRepo *repository.SchemaVersionRepository
 
 	// metadata services
 	ProjectService        *metadata.ProjectService
@@ -40,6 +41,7 @@ type Application struct {
 	NodeTopologyService   *metadata.TopologyService
 	ColumnService         *metadata.ColumnService
 	FKEdgesService        *metadata.FKEdgesService
+	SchemaVersionService  *metadata.SchemaVersionService
 
 	// replication services
 	ReplicationService *replication.ReplicationService
@@ -117,6 +119,7 @@ func (a *Application) Start(ctx context.Context) error {
 		a.TopologyRepo,
 		a.ColumnRepo,
 		a.FKEdgesRepo,
+		a.SchemaVersionRepo,
 		a.CacheManager,
 	)
 
@@ -211,6 +214,7 @@ func (a *Application) Start(ctx context.Context) error {
 	a.SchemaService = schema.NewSchemaService(
 		a.ColumnService,
 		a.FKEdgesService,
+		a.SchemaVersionService,
 	)
 
 	logger.Logger.Info("Schema service initialized")
