@@ -26,8 +26,10 @@ func NewColumnRepository(connConfig *sql.DB) *ColumnRepository {
 }
 
 func (r *ColumnRepository) ColumnAdd(ctx context.Context, column *Column) error {
-	query := `INSERT INTO columns (project_id,table_name,column_name,data_type,is_nullable,is_pk) 
-	VALUES ($1,$2,$3,$4,$5,$6)`
+	query := `
+		INSERT INTO columns (project_id,table_name,column_name,data_type,nullable,is_primary_key)
+		VALUES ($1,$2,$3,$4,$5,$6)
+	`
 
 	_, err := r.conn.ExecContext(ctx,
 		query, column.ProjectID, column.TableName,
@@ -54,9 +56,11 @@ func (r *ColumnRepository) ColumnReplace(ctx context.Context, projectID string,
 	}
 
 	for _, col := range cols {
-		query := `INSERT INTO columns (project_id,table_name,column_name,data_type,is_nullable,is_pk) 
-		VALUES ($1,$2,$3,$4,$5,$6)`
-		_, err = tx.ExecContext(ctx, query, col.ProjectID, col.TableName, col.ColumnName, col.DataType, col.IsNullable, col.IsPk)
+		query := `
+			INSERT INTO columns (project_id,table_name,column_name,data_type,nullable,is_primary_key)
+			VALUES ($1,$2,$3,$4,$5,$6)
+		`
+		_, err = tx.ExecContext(ctx, query, projectID, col.TableName, col.ColumnName, col.DataType, col.IsNullable, col.IsPk)
 		if err != nil {
 			return err
 		}
@@ -75,7 +79,7 @@ func (r *ColumnRepository) ColumnsListByProjectID(ctx context.Context, projectID
 	}
 	defer rows.Close()
 
-	var columns []Column
+	columns := make([]Column, 0)
 	for rows.Next() {
 		var column Column
 		err := rows.Scan(&column.ProjectID, &column.TableName, &column.ColumnName, &column.DataType, &column.IsNullable, &column.IsPk)
@@ -84,5 +88,9 @@ func (r *ColumnRepository) ColumnsListByProjectID(ctx context.Context, projectID
 		}
 		columns = append(columns, column)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return columns, nil
 }

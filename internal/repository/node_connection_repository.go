@@ -89,3 +89,63 @@ func (r *NodeConnectionRepository) GetConnectionByNodeId(ctx context.Context, no
 
 	return nodeConn, nil
 }
+
+func (r *NodeConnectionRepository) ConnectionsListByProjectID(
+	ctx context.Context,
+	projectID string,
+) ([]NodeConnection, error) {
+
+	query := `
+		SELECT
+			node_connections.node_id,
+			node_connections.host,
+			node_connections.port,
+			node_connections.database_name,
+			node_connections.username,
+			node_connections.password,
+			node_connections.created_at,
+			node_connections.updated_at
+		FROM node_connections
+		INNER JOIN nodes
+		ON nodes.id = node_connections.node_id
+		WHERE nodes.project_id = $1
+	`
+
+	rows, err := r.conn.QueryContext(
+		ctx,
+		query,
+		projectID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	connections := make([]NodeConnection, 0)
+
+	for rows.Next() {
+		var connection NodeConnection
+
+		err := rows.Scan(
+			&connection.NodeId,
+			&connection.Host,
+			&connection.Port,
+			&connection.DatabaseName,
+			&connection.Username,
+			&connection.Password,
+			&connection.CreatedAt,
+			&connection.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		connections = append(connections, connection)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return connections, nil
+}

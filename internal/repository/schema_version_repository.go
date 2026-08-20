@@ -118,13 +118,22 @@ func (r *SchemaVersionRepository) DeleteSchema(
 		WHERE project_id = $1
 	`
 
-	_, err := r.db.ExecContext(
+	res, err := r.db.ExecContext(
 		ctx,
 		query,
 		projectID,
 	)
 	if err != nil {
 		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return sql.ErrNoRows
 	}
 
 	return nil
