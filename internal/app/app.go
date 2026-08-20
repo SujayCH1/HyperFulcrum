@@ -4,6 +4,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"hyperfulcrum/internal/api/handlers"
 	"hyperfulcrum/internal/api/middleware"
@@ -60,7 +61,7 @@ type Application struct {
 	ReplicationHandler *handlers.ReplicationHandler
 
 	// connection pool
-	ConnectionStore   *connections.ConnectionStore
+	PoolStore         *connections.PoolStore
 	ConnectionManager *connections.ConnectionManager
 
 	// cache
@@ -77,8 +78,19 @@ func New(ctx context.Context) (*Application, error) {
 	}, nil
 }
 
-func (a *Application) Start(ctx context.Context) error {
+func (a *Application) Start(ctx context.Context) (startErr error) {
 	logger.Logger.Info("Starting HyperFulcrum application")
+
+	defer func() {
+		if startErr == nil {
+			return
+		}
+
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		startErr = errors.Join(startErr, a.Stop(cleanupCtx))
+	}()
 
 	// Database
 	logger.Logger.Info("Connecting to application database")
@@ -138,9 +150,9 @@ func (a *Application) Start(ctx context.Context) error {
 	// Connections
 	logger.Logger.Info("Initializing connection manager")
 
-	a.ConnectionStore = connections.NewConnectionStore()
+	a.PoolStore = connections.NewPoolStore()
 	a.ConnectionManager = connections.NewConnectionManager(
-		a.ConnectionStore,
+		a.PoolStore,
 		a.ProjectRepo,
 		a.NodeRepo,
 		a.NodeConnRepo,
@@ -148,7 +160,7 @@ func (a *Application) Start(ctx context.Context) error {
 
 	logger.Logger.Info("Connection manager initialized")
 
-	if err := a.ConnectionManager.InitiateActiveConnections(ctx); err != nil {
+	if err := a.ConnectionManager.InitializeActiveConnections(ctx); err != nil {
 		return fmt.Errorf("initialize active connections: %w", err)
 	}
 
@@ -164,12 +176,14 @@ func (a *Application) Start(ctx context.Context) error {
 		a.ProjectRepo,
 		a.CacheManager,
 		a.CacheRefresher,
+		a.ConnectionManager,
 	)
 
 	a.NodeService = metadata.NewNodeService(
 		a.NodeRepo,
 		a.CacheManager,
 		a.CacheRefresher,
+		a.ConnectionManager,
 	)
 
 	a.NodeConnectionService = metadata.NewNodeConnectionService(
@@ -177,6 +191,7 @@ func (a *Application) Start(ctx context.Context) error {
 		a.NodeRepo,
 		a.CacheManager,
 		a.CacheRefresher,
+		a.ConnectionManager,
 	)
 
 	a.NodeTopologyService = metadata.NewTpologyService(
@@ -304,9 +319,20 @@ func (a *Application) Stop(ctx context.Context) error {
 
 		if err := a.Server.Shutdown(ctx); err != nil {
 			logger.Logger.Error("Failed to stop HTTP server", "error", err)
-			stopErr = err
+			stopErr = errors.Join(stopErr, err)
 		} else {
 			logger.Logger.Info("HTTP server stopped")
+		}
+	}
+
+	if a.ConnectionManager != nil {
+		logger.Logger.Info("Closing node connection pools")
+
+		if err := a.ConnectionManager.Close(); err != nil {
+			logger.Logger.Error("Failed to close node connection pools", "error", err)
+			stopErr = errors.Join(stopErr, err)
+		} else {
+			logger.Logger.Info("Node connection pools closed")
 		}
 	}
 
@@ -315,9 +341,7 @@ func (a *Application) Stop(ctx context.Context) error {
 
 		if err := a.database.Close(); err != nil {
 			logger.Logger.Error("Failed to close database connection", "error", err)
-			if stopErr == nil {
-				stopErr = err
-			}
+			stopErr = errors.Join(stopErr, err)
 		} else {
 			logger.Logger.Info("Database connection closed")
 		}
