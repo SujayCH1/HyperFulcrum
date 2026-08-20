@@ -43,9 +43,9 @@ func (h *ProjectHandler) CreateProject(
 		payload.Description,
 	)
 	if err != nil {
-		utils.WriteJSONErrorResponse(
+		writeHandlerError(
 			w,
-			http.StatusInternalServerError,
+			"Project not found",
 			"Failed to create project",
 			err,
 		)
@@ -63,7 +63,7 @@ func (h *ProjectHandler) CreateProject(
 func (h *ProjectHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 	projects, err := h.service.ListProjects(r.Context())
 	if err != nil {
-		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to list projects", err)
+		writeHandlerError(w, "Project not found", "Failed to list projects", err)
 		return
 	}
 
@@ -72,14 +72,10 @@ func (h *ProjectHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 
 func (h *ProjectHandler) GetProjectByID(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if id == "" {
-		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Project ID is required", nil)
-		return
-	}
 
 	project, err := h.service.GetProjectByID(r.Context(), id)
 	if err != nil {
-		utils.WriteJSONErrorResponse(w, http.StatusNotFound, "Project not found", err)
+		writeHandlerError(w, "Project not found", "Failed to get project", err)
 		return
 	}
 
@@ -88,14 +84,10 @@ func (h *ProjectHandler) GetProjectByID(w http.ResponseWriter, r *http.Request) 
 
 func (h *ProjectHandler) RemoveProject(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if id == "" {
-		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Project ID is required", nil)
-		return
-	}
 
 	err := h.service.DeleteProject(r.Context(), id)
 	if err != nil {
-		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to remove project", err)
+		writeHandlerError(w, "Project not found", "Failed to remove project", err)
 		return
 	}
 
@@ -105,7 +97,7 @@ func (h *ProjectHandler) RemoveProject(w http.ResponseWriter, r *http.Request) {
 func (h *ProjectHandler) GetReadyProjects(w http.ResponseWriter, r *http.Request) {
 	projects, err := h.service.GetReadyProjects(r.Context())
 	if err != nil {
-		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to get ready projects", err)
+		writeHandlerError(w, "Project not found", "Failed to get ready projects", err)
 		return
 	}
 

@@ -22,25 +22,25 @@ type PromoteReplicaDto struct {
 func (dto *CreateReplicationDto) ValidateCreate() error {
 	return validation.ValidateStruct(
 		dto,
-		validation.Field(&dto.ProjectID, validation.Required, validation.Length(3, 100)),
-		validation.Field(&dto.ShardNodeID, validation.Required, validation.Length(3, 100)),
-		validation.Field(&dto.ReplicaNodeID, validation.Required, validation.Length(3, 100)),
+		validation.Field(&dto.ProjectID, validation.Required, validUUID),
+		validation.Field(&dto.ShardNodeID, validation.Required, validUUID),
+		validation.Field(&dto.ReplicaNodeID, validation.Required, validUUID),
 	)
 }
 
 func (dto *DeleteReplicationDto) ValidateDelete() error {
 	return validation.ValidateStruct(
 		dto,
-		validation.Field(&dto.ProjectID, validation.Required, validation.Length(3, 100)),
-		validation.Field(&dto.RelationID, validation.Required, validation.Length(3, 100)),
+		validation.Field(&dto.ProjectID, validation.Required, validUUID),
+		validation.Field(&dto.RelationID, validation.Required, validUUID),
 	)
 }
 
 func (dto *PromoteReplicaDto) ValidatePromote() error {
 	return validation.ValidateStruct(
 		dto,
-		validation.Field(&dto.RelationID, validation.Required, validation.Length(3, 100)),
-		validation.Field(&dto.ShardNodeID, validation.Required, validation.Length(3, 100)),
-		validation.Field(&dto.ReplicaNodeID, validation.Required, validation.Length(3, 100)),
+		validation.Field(&dto.RelationID, validation.Required, validUUID),
+		validation.Field(&dto.ShardNodeID, validation.Required, validUUID),
+		validation.Field(&dto.ReplicaNodeID, validation.Required, validUUID),
 	)
 }

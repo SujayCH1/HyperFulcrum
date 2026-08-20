@@ -43,9 +43,9 @@ func (h *TopologyHandler) CreateTopology(
 	)
 
 	if err != nil {
-		utils.WriteJSONErrorResponse(
+		writeHandlerError(
 			w,
-			http.StatusInternalServerError,
+			"Topology not found",
 			"Failed to create topology",
 			err,
 		)
@@ -55,7 +55,7 @@ func (h *TopologyHandler) CreateTopology(
 	utils.WriteJSONSuccessResponse(
 		w,
 		http.StatusCreated,
-		"TOpology created successfully",
+		"Topology created successfully",
 		topology,
 	)
 
@@ -82,10 +82,10 @@ func (h *TopologyHandler) DeleteTopology(
 		payload.ProjectID,
 	)
 	if err != nil {
-		utils.WriteJSONErrorResponse(
+		writeHandlerError(
 			w,
-			http.StatusInternalServerError,
-			"Failed to delete toology",
+			"Topology not found",
+			"Failed to delete topology",
 			err,
 		)
 		return
@@ -94,7 +94,7 @@ func (h *TopologyHandler) DeleteTopology(
 	utils.WriteJSONSuccessResponse(
 		w,
 		http.StatusOK,
-		"Project created successfully",
+		"Topology deleted successfully",
 		nil,
 	)
 }
@@ -110,9 +110,9 @@ func (h *TopologyHandler) ListTopologies(
 		projectID,
 	)
 	if err != nil {
-		utils.WriteJSONErrorResponse(
+		writeHandlerError(
 			w,
-			http.StatusNotFound,
+			"Project not found",
 			"Failed to fetch topology",
 			err,
 		)
@@ -140,10 +140,10 @@ func (h *TopologyHandler) GetTopologyByID(
 		relationID,
 	)
 	if err != nil {
-		utils.WriteJSONErrorResponse(
+		writeHandlerError(
 			w,
-			http.StatusNotFound,
 			"Topology not found",
+			"Failed to fetch topology",
 			err,
 		)
 		return

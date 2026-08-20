@@ -12,7 +12,7 @@ type NodeConnection struct {
 	Port         int    `json:"port"`
 	DatabaseName string `json:"database_name"`
 	Username     string `json:"username"`
-	Password     string `json:"password"`
+	Password     string `json:"-"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

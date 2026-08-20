@@ -17,3 +17,11 @@ func (dto *NodeDto) Validate() error {
 		validation.Field(&dto.Type, validation.Required, validation.In("shard", "replica")),
 	)
 }
+
+func ValidateNodeName(name string) error {
+	return validation.Validate(name, validation.Required, validation.Length(3, 100))
+}
+
+func ValidateNodeType(nodeType string) error {
+	return validation.Validate(nodeType, validation.Required, validation.In("shard", "replica"))
+}
