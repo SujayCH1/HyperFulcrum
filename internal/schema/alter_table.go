@@ -11,9 +11,12 @@ func applyAlterTable(
 	stmt *ir.DDLStatement,
 ) error {
 
-	table, exists := schema.Tables[stmt.Table.Name]
+	table, exists := schema.Tables[stmt.Table.Key()]
 	if !exists {
-		return fmt.Errorf("table %q does not exist", stmt.Table.Name)
+		if stmt.IfExists {
+			return nil
+		}
+		return fmt.Errorf("table %q does not exist", stmt.Table.Key())
 	}
 
 	for _, operation := range stmt.AlterOperations {
@@ -36,13 +39,14 @@ func applyAlterTable(
 				return fmt.Errorf("missing column name for DROP COLUMN")
 			}
 
-			if err := dropColumn(table, operation.OldName); err != nil {
+			if err := dropColumn(schema, table, operation.OldName); err != nil {
 				return err
 			}
 
 		case ir.RenameColumn:
 
 			if err := renameColumn(
+				schema,
 				table,
 				operation.OldName,
 				operation.NewName,
@@ -82,6 +86,55 @@ func applyAlterTable(
 			); err != nil {
 				return err
 			}
+
+		case ir.AlterColumnType:
+
+			if operation.DataType == nil {
+				return fmt.Errorf("missing data type for ALTER COLUMN")
+			}
+
+			column, exists := table.Columns[operation.OldName]
+			if !exists {
+				return fmt.Errorf("column %q does not exist", operation.OldName)
+			}
+
+			column.DataType = *operation.DataType
+
+		case ir.SetNotNull:
+
+			column, exists := table.Columns[operation.OldName]
+			if !exists {
+				return fmt.Errorf("column %q does not exist", operation.OldName)
+			}
+
+			column.Nullable = false
+
+		case ir.DropNotNull:
+
+			column, exists := table.Columns[operation.OldName]
+			if !exists {
+				return fmt.Errorf("column %q does not exist", operation.OldName)
+			}
+
+			column.Nullable = true
+
+		case ir.SetDefault:
+
+			column, exists := table.Columns[operation.OldName]
+			if !exists {
+				return fmt.Errorf("column %q does not exist", operation.OldName)
+			}
+
+			column.DefaultValue = operation.Expression
+
+		case ir.DropDefault:
+
+			column, exists := table.Columns[operation.OldName]
+			if !exists {
+				return fmt.Errorf("column %q does not exist", operation.OldName)
+			}
+
+			column.DefaultValue = nil
 
 		default:
 

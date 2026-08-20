@@ -10,11 +10,15 @@ type Column struct {
 	Nullable bool
 
 	DefaultValue *Expression
+	Identity     string
+	Generated    *Expression
 }
 
 type Reference struct {
-	Table   string
-	Columns []string
+	Table    Table
+	Columns  []string
+	OnUpdate string
+	OnDelete string
 }
 
 type ConstraintType string
@@ -28,18 +32,24 @@ const (
 )
 
 type Constraint struct {
-	Name       string
-	Type       ConstraintType
-	Columns    []string
-	Reference  *Reference
-	Expression *Expression
+	Name              string
+	Type              ConstraintType
+	Columns           []string
+	Reference         *Reference
+	Expression        *Expression
+	Deferrable        bool
+	InitiallyDeferred bool
+	NullsNotDistinct  bool
 }
 
 type Index struct {
-	Name    string
-	Table   string
-	Columns []string
-	Unique  bool
+	Name        string
+	Table       Table
+	Columns     []string
+	Expressions []Expression
+	Include     []string
+	Predicate   *Expression
+	Unique      bool
 }
 
 type AlterOperationType string
@@ -56,6 +66,16 @@ const (
 	DropConstraint AlterOperationType = "DROP_CONSTRAINT"
 
 	RenameTable AlterOperationType = "RENAME_TABLE"
+
+	AlterColumnType AlterOperationType = "ALTER_COLUMN_TYPE"
+
+	SetNotNull AlterOperationType = "SET_NOT_NULL"
+
+	DropNotNull AlterOperationType = "DROP_NOT_NULL"
+
+	SetDefault AlterOperationType = "SET_DEFAULT"
+
+	DropDefault AlterOperationType = "DROP_DEFAULT"
 )
 
 type AlterOperation struct {
@@ -64,6 +84,8 @@ type AlterOperation struct {
 	Constraint *Constraint
 	OldName    string
 	NewName    string
+	Expression *Expression
+	DataType   *DataType
 }
 
 type DDLStatement struct {
@@ -71,10 +93,14 @@ type DDLStatement struct {
 
 	Cmd             Command
 	Table           Table
+	Tables          []Table
 	Columns         []Column
 	Constraints     []Constraint
 	Indexes         []Index
 	AlterOperations []AlterOperation
+	IfExists        bool
+	IfNotExists     bool
+	Cascade         bool
 }
 
 func (d *DDLStatement) Kind() StatementKind {

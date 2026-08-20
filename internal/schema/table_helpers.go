@@ -18,7 +18,7 @@ func addColumn(
 		)
 	}
 
-	column.Table = table.Name
+	column.Table = table.Table.Key()
 
 	c := column
 
@@ -28,6 +28,7 @@ func addColumn(
 }
 
 func dropColumn(
+	schema *LogicalSchema,
 	table *LogicalTable,
 	columnName string,
 ) error {
@@ -38,6 +39,31 @@ func dropColumn(
 
 	delete(table.Columns, columnName)
 
+	for name, constraint := range table.Constraints {
+		if containsColumn(constraint.Columns, columnName) {
+			delete(table.Constraints, name)
+		}
+	}
+
+	for name, index := range table.Indexes {
+		if containsColumn(index.Columns, columnName) {
+			delete(table.Indexes, name)
+		}
+	}
+
+	for _, candidate := range schema.Tables {
+		for name, constraint := range candidate.Constraints {
+			if constraint.Type != ir.ForeignKey || constraint.Reference == nil {
+				continue
+			}
+
+			if constraint.Reference.Table.Key() == table.Table.Key() &&
+				containsColumn(constraint.Reference.Columns, columnName) {
+				delete(candidate.Constraints, name)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -46,7 +72,7 @@ func addConstraint(
 	constraint ir.Constraint,
 ) error {
 
-	ensureConstraintName(table.Name, &constraint)
+	ensureConstraintName(table.Table.Key(), &constraint)
 
 	if _, exists := table.Constraints[constraint.Name]; exists {
 		return fmt.Errorf(
@@ -95,6 +121,7 @@ func dropIndex(
 }
 
 func renameColumn(
+	schema *LogicalSchema,
 	table *LogicalTable,
 	oldName string,
 	newName string,
@@ -125,6 +152,32 @@ func renameColumn(
 		}
 	}
 
+	for _, index := range table.Indexes {
+		for i, columnName := range index.Columns {
+			if columnName == oldName {
+				index.Columns[i] = newName
+			}
+		}
+	}
+
+	for _, candidate := range schema.Tables {
+		for _, constraint := range candidate.Constraints {
+			if constraint.Type != ir.ForeignKey || constraint.Reference == nil {
+				continue
+			}
+
+			if constraint.Reference.Table.Key() != table.Table.Key() {
+				continue
+			}
+
+			for i, columnName := range constraint.Reference.Columns {
+				if columnName == oldName {
+					constraint.Reference.Columns[i] = newName
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -134,26 +187,29 @@ func renameTable(
 	newName string,
 ) error {
 
-	if _, exists := schema.Tables[newName]; exists {
-		return fmt.Errorf("table %q already exists", newName)
-	}
+	oldName := table.Table.Key()
+	newTable := table.Table
+	newTable.Name = newName
+	newKey := newTable.Key()
 
-	oldName := table.Name
+	if _, exists := schema.Tables[newKey]; exists {
+		return fmt.Errorf("table %q already exists", newKey)
+	}
 
 	delete(schema.Tables, oldName)
 
-	table.Name = newName
+	table.Table = newTable
 
-	schema.Tables[newName] = table
+	schema.Tables[newKey] = table
 
 	// Update every column.
 	for _, column := range table.Columns {
-		column.Table = newName
+		column.Table = newKey
 	}
 
 	// Update every index.
 	for _, index := range table.Indexes {
-		index.Table = newName
+		index.Table = newTable
 	}
 
 	// Update FK references across the entire schema.
@@ -169,14 +225,24 @@ func renameTable(
 				continue
 			}
 
-			if constraint.Reference.Table == oldName {
-				constraint.Reference.Table = newName
+			if constraint.Reference.Table.Key() == oldName {
+				constraint.Reference.Table = newTable
 			}
 		}
 
 	}
 
 	return nil
+}
+
+func containsColumn(columns []string, name string) bool {
+	for _, column := range columns {
+		if column == name {
+			return true
+		}
+	}
+
+	return false
 }
 
 func dropConstraintByName(

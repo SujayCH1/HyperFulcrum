@@ -1,36 +1,19 @@
 package postgres
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 
-	"github.com/valkdb/postgresparser"
+	pg_query "github.com/pganalyze/pg_query_go/v5"
 
 	"hyperfulcrum/internal/parser/ir"
 )
 
-type PostgreSQLParser struct {
-	opts postgresparser.ParseOptions
-}
+type PostgreSQLParser struct{}
 
-type Option func(*PostgreSQLParser)
-
-func WithFieldComments() Option {
-	return func(p *PostgreSQLParser) {
-		p.opts.IncludeCreateTableFieldComments = true
-	}
-}
-
-// New returns *PostgreSQLParser (a concrete type, not parser.Parser) — this
-// package must never import hyperfulcrum/internal/parser, or you get the
-// cycle you just hit. *PostgreSQLParser still satisfies parser.Parser
-// structurally; factory.go (which imports both packages) does the
-// interface conversion in `return postgres.New()`.
-func New(opts ...Option) *PostgreSQLParser {
-	p := &PostgreSQLParser{}
-	for _, opt := range opts {
-		opt(p)
-	}
-	return p
+func New() *PostgreSQLParser {
+	return &PostgreSQLParser{}
 }
 
 func (p *PostgreSQLParser) Parse(sql string) (ir.Statement, error) {
@@ -39,12 +22,16 @@ func (p *PostgreSQLParser) Parse(sql string) (ir.Statement, error) {
 		return nil, ir.ErrEmptySQL
 	}
 
-	result, err := postgresparser.ParseSQLWithOptions(sql, p.opts)
+	result, err := pg_query.Parse(sql)
 	if err != nil {
-		return nil, translateErr(err)
+		return nil, fmt.Errorf("%w: %v", ir.ErrInvalidAST, err)
 	}
 
-	return convertStatement(result)
+	if len(result.Stmts) != 1 {
+		return nil, ir.ErrMultipleSQL
+	}
+
+	return convertStatement(result.Stmts[0].Stmt, sql)
 }
 
 func (p *PostgreSQLParser) ParseBatch(sql string) (*ir.Batch, error) {
@@ -53,25 +40,85 @@ func (p *PostgreSQLParser) ParseBatch(sql string) (*ir.Batch, error) {
 		return nil, ir.ErrEmptySQL
 	}
 
-	result, err := postgresparser.ParseSQLAllWithOptions(sql, p.opts)
+	result, err := pg_query.Parse(sql)
 	if err != nil {
-		return nil, translateErr(err)
+		return nil, fmt.Errorf("%w: %v", ir.ErrInvalidAST, err)
 	}
 
-	batch := &ir.Batch{}
+	if len(result.Stmts) == 0 {
+		return nil, ir.ErrEmptySQL
+	}
 
-	for _, stmtResult := range result.Statements {
-		if stmtResult.Query == nil {
-			continue
-		}
+	batch := &ir.Batch{
+		Statements: make([]ir.Statement, 0, len(result.Stmts)),
+	}
 
-		s, err := convertStatement(stmtResult.Query)
+	for i, raw := range result.Stmts {
+		statement, err := convertStatement(raw.Stmt, statementSQL(sql, result.Stmts, i))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("statement %d: %w", i+1, err)
 		}
-
-		batch.Statements = append(batch.Statements, s)
+		batch.Statements = append(batch.Statements, statement)
 	}
 
 	return batch, nil
+}
+
+func statementSQL(sql string, statements []*pg_query.RawStmt, index int) string {
+	start := int(statements[index].StmtLocation)
+	end := len(sql)
+
+	if statements[index].StmtLen > 0 {
+		end = start + int(statements[index].StmtLen)
+	} else if index+1 < len(statements) {
+		end = int(statements[index+1].StmtLocation)
+	}
+
+	if start < 0 || start > len(sql) || end < start || end > len(sql) {
+		return ""
+	}
+
+	return strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(sql[start:end]), ";"))
+}
+
+func convertStatement(node *pg_query.Node, rawSQL string) (ir.Statement, error) {
+	if node == nil {
+		return nil, ir.ErrNilStatement
+	}
+
+	metadata := ir.Metadata{
+		RawSQL:        rawSQL,
+		SourceDialect: "postgres",
+	}
+
+	switch {
+	case node.GetCreateStmt() != nil:
+		return convertCreateTable(node.GetCreateStmt(), metadata)
+	case node.GetAlterTableStmt() != nil:
+		return convertAlterTable(node.GetAlterTableStmt(), metadata)
+	case node.GetDropStmt() != nil:
+		return convertDrop(node.GetDropStmt(), metadata)
+	case node.GetIndexStmt() != nil:
+		return convertCreateIndex(node.GetIndexStmt(), metadata)
+	case node.GetRenameStmt() != nil:
+		return convertRename(node.GetRenameStmt(), metadata)
+	case node.GetTruncateStmt() != nil:
+		return convertTruncate(node.GetTruncateStmt(), metadata)
+	case node.GetSelectStmt() != nil:
+		return convertRoute(node, ir.Select, metadata)
+	case node.GetInsertStmt() != nil:
+		return convertRoute(node, ir.Insert, metadata)
+	case node.GetUpdateStmt() != nil:
+		return convertRoute(node, ir.Update, metadata)
+	case node.GetDeleteStmt() != nil:
+		return convertRoute(node, ir.Delete, metadata)
+	case node.GetMergeStmt() != nil:
+		return convertRoute(node, ir.Merge, metadata)
+	default:
+		return nil, ir.ErrUnsupportedSQL
+	}
+}
+
+func unsupported(value any) error {
+	return errors.Join(ir.ErrUnsupportedSQL, fmt.Errorf("%v", value))
 }
