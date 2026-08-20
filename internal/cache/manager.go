@@ -23,3 +23,23 @@ func NewCacheManager() *CacheManager {
 		SchemaVersion: NewSchemaVersionStore(),
 	}
 }
+
+func (m *CacheManager) DeleteProject(projectID string) {
+	m.Projects.Delete(projectID)
+	m.Nodes.DeleteProject(projectID)
+	m.Connections.DeleteProject(projectID)
+	m.Topology.DeleteByProjectID(projectID)
+	m.Columns.DeleteProject(projectID)
+	m.FKEdges.DeleteProject(projectID)
+	m.SchemaVersion.DeleteProject(projectID)
+}
+
+func (m *CacheManager) Clear() {
+	m.Projects.Clear()
+	m.Nodes.Clear()
+	m.Connections.Clear()
+	m.Topology.Clear()
+	m.Columns.Clear()
+	m.FKEdges.Clear()
+	m.SchemaVersion.Clear()
+}

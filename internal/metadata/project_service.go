@@ -53,9 +53,9 @@ func (s *ProjectService) ListProjects(
 	ctx context.Context,
 ) ([]repository.Project, error) {
 
-	projects := s.cache.Projects.GetAll()
+	projects, loaded := s.cache.Projects.GetAll()
 
-	if len(projects) > 0 {
+	if loaded {
 		return projects, nil
 	}
 
@@ -63,7 +63,9 @@ func (s *ProjectService) ListProjects(
 		return nil, err
 	}
 
-	return s.cache.Projects.GetAll(), nil
+	projects, _ = s.cache.Projects.GetAll()
+
+	return projects, nil
 }
 
 func (s *ProjectService) GetProjectByID(
@@ -74,6 +76,10 @@ func (s *ProjectService) GetProjectByID(
 	project, ok := s.cache.Projects.Get(projectID)
 	if ok {
 		return project, nil
+	}
+
+	if s.cache.Projects.Loaded() {
+		return repository.Project{}, sql.ErrNoRows
 	}
 
 	if err := s.refresher.RefreshProject(
@@ -109,6 +115,8 @@ func (s *ProjectService) DeleteProject(
 	); err != nil {
 		return err
 	}
+
+	s.cache.DeleteProject(projectID)
 
 	return s.refresher.RefreshProjects(ctx)
 }

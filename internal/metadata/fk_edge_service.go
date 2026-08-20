@@ -51,8 +51,8 @@ func (s *FKEdgesService) ListEdges(
 	projectID string,
 ) ([]repository.FkEdges, error) {
 
-	edges := s.cache.FKEdges.GetByProject(projectID)
-	if len(edges) > 0 {
+	edges, loaded := s.cache.FKEdges.GetByProject(projectID)
+	if loaded {
 		return edges, nil
 	}
 
@@ -63,7 +63,7 @@ func (s *FKEdgesService) ListEdges(
 		return nil, err
 	}
 
-	edges = s.cache.FKEdges.GetByProject(projectID)
+	edges, _ = s.cache.FKEdges.GetByProject(projectID)
 
 	return edges, nil
 }
@@ -74,12 +74,12 @@ func (s *FKEdgesService) ListByParentTable(
 	tableName string,
 ) ([]repository.FkEdges, error) {
 
-	edges := s.cache.FKEdges.GetByTable(
+	edges, loaded := s.cache.FKEdges.GetByTable(
 		projectID,
 		tableName,
 	)
 
-	if len(edges) == 0 {
+	if !loaded {
 		if err := s.refresher.RefreshFKEdges(
 			ctx,
 			projectID,
@@ -87,7 +87,7 @@ func (s *FKEdgesService) ListByParentTable(
 			return nil, err
 		}
 
-		edges = s.cache.FKEdges.GetByTable(
+		edges, _ = s.cache.FKEdges.GetByTable(
 			projectID,
 			tableName,
 		)
@@ -110,12 +110,12 @@ func (s *FKEdgesService) ListByChildTable(
 	tableName string,
 ) ([]repository.FkEdges, error) {
 
-	edges := s.cache.FKEdges.GetByTable(
+	edges, loaded := s.cache.FKEdges.GetByTable(
 		projectID,
 		tableName,
 	)
 
-	if len(edges) == 0 {
+	if !loaded {
 		if err := s.refresher.RefreshFKEdges(
 			ctx,
 			projectID,
@@ -123,7 +123,7 @@ func (s *FKEdgesService) ListByChildTable(
 			return nil, err
 		}
 
-		edges = s.cache.FKEdges.GetByTable(
+		edges, _ = s.cache.FKEdges.GetByTable(
 			projectID,
 			tableName,
 		)

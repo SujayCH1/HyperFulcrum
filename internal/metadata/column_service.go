@@ -51,8 +51,8 @@ func (s *ColumnService) ListColumns(
 	projectID string,
 ) ([]repository.Column, error) {
 
-	columns := s.cache.Columns.GetByProject(projectID)
-	if len(columns) > 0 {
+	columns, loaded := s.cache.Columns.GetByProject(projectID)
+	if loaded {
 		return columns, nil
 	}
 
@@ -63,7 +63,7 @@ func (s *ColumnService) ListColumns(
 		return nil, err
 	}
 
-	columns = s.cache.Columns.GetByProject(projectID)
+	columns, _ = s.cache.Columns.GetByProject(projectID)
 
 	return columns, nil
 }

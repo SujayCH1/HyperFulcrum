@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"context"
+	"database/sql"
 
 	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/repository"
@@ -57,6 +58,10 @@ func (s *SchemaVersionService) GetSchemaVersion(
 		return schema, nil
 	}
 
+	if s.cache.SchemaVersion.Loaded(projectID) {
+		return repository.SchemaVersion{}, sql.ErrNoRows
+	}
+
 	if err := s.refresher.RefreshSchemaVersion(
 		ctx,
 		projectID,
@@ -64,7 +69,10 @@ func (s *SchemaVersionService) GetSchemaVersion(
 		return repository.SchemaVersion{}, err
 	}
 
-	schema, _ = s.cache.SchemaVersion.Get(projectID)
+	schema, ok = s.cache.SchemaVersion.Get(projectID)
+	if !ok {
+		return repository.SchemaVersion{}, sql.ErrNoRows
+	}
 
 	return schema, nil
 }
