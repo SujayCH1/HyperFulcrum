@@ -17,8 +17,8 @@ func TopologyCreateValidator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload dto.TopologyCreateDto
 
-		if err := utils.ReadJSONRequest(r, &payload); err != nil {
-			utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Invalid request body", err)
+		if err := utils.ReadJSONRequest(w, r, &payload); err != nil {
+			utils.WriteJSONErrorResponse(w, JSONErrorStatus(err), "Invalid request body", err)
 			return
 		}
 
@@ -41,8 +41,8 @@ func TopologyDeleteValidator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload dto.TopologyDeleteDto
 
-		if err := utils.ReadJSONRequest(r, &payload); err != nil {
-			utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Invalid request body", err)
+		if err := utils.ReadJSONRequest(w, r, &payload); err != nil {
+			utils.WriteJSONErrorResponse(w, JSONErrorStatus(err), "Invalid request body", err)
 			return
 		}
 

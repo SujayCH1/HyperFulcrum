@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"hyperfulcrum/internal/api/dto"
 	"hyperfulcrum/internal/api/middleware"
 	"hyperfulcrum/internal/metadata"
 	"hyperfulcrum/pkg/utils"
@@ -23,10 +24,6 @@ func NewNodeHandler(
 
 func (h *NodeHandler) AddNode(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("projectId")
-	if projectID == "" {
-		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "projectID is required", nil)
-		return
-	}
 
 	payload, ok := middleware.GetNodePayload(r)
 	if !ok {
@@ -36,7 +33,7 @@ func (h *NodeHandler) AddNode(w http.ResponseWriter, r *http.Request) {
 
 	err := h.service.AddNode(r.Context(), projectID, payload.Type, payload.Name)
 	if err != nil {
-		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to add node", err)
+		writeHandlerError(w, "Project not found", "Failed to add node", err)
 		return
 	}
 
@@ -45,14 +42,10 @@ func (h *NodeHandler) AddNode(w http.ResponseWriter, r *http.Request) {
 
 func (h *NodeHandler) ListNodes(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("projectId")
-	if projectID == "" {
-		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "projectID is required", nil)
-		return
-	}
 
 	nodes, err := h.service.ListNodes(r.Context(), projectID)
 	if err != nil {
-		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to list nodes", err)
+		writeHandlerError(w, "Project not found", "Failed to list nodes", err)
 		return
 	}
 
@@ -61,14 +54,10 @@ func (h *NodeHandler) ListNodes(w http.ResponseWriter, r *http.Request) {
 
 func (h *NodeHandler) RemoveNode(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.PathValue("id")
-	if nodeID == "" {
-		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "nodeID is required", nil)
-		return
-	}
 
 	err := h.service.RemoveNode(r.Context(), nodeID)
 	if err != nil {
-		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to remove node", err)
+		writeHandlerError(w, "Node not found", "Failed to remove node", err)
 		return
 	}
 
@@ -79,14 +68,14 @@ func (h *NodeHandler) UpdateNodeName(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.PathValue("id")
 	name := r.URL.Query().Get("name")
 
-	if nodeID == "" || name == "" {
-		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "nodeID and name are required", nil)
+	if err := dto.ValidateNodeName(name); err != nil {
+		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Invalid node name", err)
 		return
 	}
 
 	err := h.service.UpdateNodeName(r.Context(), nodeID, name)
 	if err != nil {
-		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to update node name", err)
+		writeHandlerError(w, "Node not found", "Failed to update node name", err)
 		return
 	}
 
@@ -97,8 +86,8 @@ func (h *NodeHandler) UpdateNodeStatus(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.PathValue("id")
 	statusStr := r.URL.Query().Get("status")
 
-	if nodeID == "" || statusStr == "" {
-		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "nodeID and status are required", nil)
+	if statusStr == "" {
+		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Status is required", nil)
 		return
 	}
 
@@ -110,7 +99,7 @@ func (h *NodeHandler) UpdateNodeStatus(w http.ResponseWriter, r *http.Request) {
 
 	err = h.service.UpdateNodeStatus(r.Context(), nodeID, status)
 	if err != nil {
-		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to update node status", err)
+		writeHandlerError(w, "Node not found", "Failed to update node status", err)
 		return
 	}
 
@@ -121,14 +110,14 @@ func (h *NodeHandler) UpdateNodeType(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.PathValue("id")
 	nodeType := r.URL.Query().Get("type")
 
-	if nodeID == "" || nodeType == "" {
-		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "nodeID and type are required", nil)
+	if err := dto.ValidateNodeType(nodeType); err != nil {
+		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Invalid node type", err)
 		return
 	}
 
 	err := h.service.UpdateNodeType(r.Context(), nodeID, nodeType)
 	if err != nil {
-		utils.WriteJSONErrorResponse(w, http.StatusInternalServerError, "Failed to update node type", err)
+		writeHandlerError(w, "Node not found", "Failed to update node type", err)
 		return
 	}
 

@@ -15,10 +15,10 @@ func ReplicationCreateValidator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload dto.CreateReplicationDto
 
-		if err := utils.ReadJSONRequest(r, &payload); err != nil {
+		if err := utils.ReadJSONRequest(w, r, &payload); err != nil {
 			utils.WriteJSONErrorResponse(
 				w,
-				http.StatusBadRequest,
+				JSONErrorStatus(err),
 				"Invalid request body",
 				err,
 			)
@@ -49,10 +49,10 @@ func ReplicationDeleteValidator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload dto.DeleteReplicationDto
 
-		if err := utils.ReadJSONRequest(r, &payload); err != nil {
+		if err := utils.ReadJSONRequest(w, r, &payload); err != nil {
 			utils.WriteJSONErrorResponse(
 				w,
-				http.StatusBadRequest,
+				JSONErrorStatus(err),
 				"Invalid request body",
 				err,
 			)
@@ -83,10 +83,10 @@ func ReplicationPromoteValidator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload dto.PromoteReplicaDto
 
-		if err := utils.ReadJSONRequest(r, &payload); err != nil {
+		if err := utils.ReadJSONRequest(w, r, &payload); err != nil {
 			utils.WriteJSONErrorResponse(
 				w,
-				http.StatusBadRequest,
+				JSONErrorStatus(err),
 				"Invalid request body",
 				err,
 			)

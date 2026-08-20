@@ -17,6 +17,7 @@ import (
 	"hyperfulcrum/internal/schema"
 	"hyperfulcrum/pkg/logger"
 	"net/http"
+	"time"
 )
 
 type Application struct {
@@ -256,11 +257,25 @@ func (a *Application) Start(ctx context.Context) error {
 		a.ReplicationHandler,
 	)
 
-	handler := middleware.CORS(mux)
+	handler := middleware.RequestID(
+		middleware.RequestLogger(
+			middleware.Recovery(
+				middleware.RequestTimeout(
+					30*time.Second,
+					middleware.CORS(mux),
+				),
+			),
+		),
+	)
 
 	a.Server = &http.Server{
-		Addr:    ":8080",
-		Handler: handler,
+		Addr:              ":8080",
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      35 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	logger.Logger.Info("Application server initialized")
