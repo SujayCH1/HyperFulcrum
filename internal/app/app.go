@@ -67,7 +67,7 @@ type Application struct {
 	CacheRefresher *cache.CacheRefresher
 
 	// api
-	Server *http.ServeMux
+	Server *http.Server
 }
 
 func New(ctx context.Context) (*Application, error) {
@@ -104,6 +104,7 @@ func (a *Application) Start(ctx context.Context) error {
 	a.TopologyRepo = repository.NewNodeTopologyRepo(a.database)
 	a.ColumnRepo = repository.NewColumnRepository(a.database)
 	a.FKEdgesRepo = repository.NewFKEdgesRepository(a.database)
+	a.SchemaVersionRepo = repository.NewSchemaVersionRepository(a.database)
 
 	logger.Logger.Info("Repositories initialized")
 
@@ -195,6 +196,12 @@ func (a *Application) Start(ctx context.Context) error {
 		a.CacheRefresher,
 	)
 
+	a.SchemaVersionService = metadata.NewSchemaVersionService(
+		a.SchemaVersionRepo,
+		a.CacheManager,
+		a.CacheRefresher,
+	)
+
 	logger.Logger.Info("Initialized metadata services")
 
 	// MAJOR SERVICES
@@ -241,7 +248,7 @@ func (a *Application) Start(ctx context.Context) error {
 	)
 
 	// server setup
-	a.Server = router.NewRouter(
+	mux := router.NewRouter(
 		a.ProjectHandler,
 		a.NodeHandler,
 		a.NodeConnectionHandler,
@@ -249,13 +256,18 @@ func (a *Application) Start(ctx context.Context) error {
 		a.ReplicationHandler,
 	)
 
-	handler := middleware.CORS(a.Server)
+	handler := middleware.CORS(mux)
+
+	a.Server = &http.Server{
+		Addr:    ":8080",
+		Handler: handler,
+	}
 
 	logger.Logger.Info("Application server initialized")
 
 	go func() {
 		logger.Logger.Info("Starting HTTP server on :8080")
-		if err := http.ListenAndServe(":8080", handler); err != nil && err != http.ErrServerClosed {
+		if err := a.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Logger.Error("HTTP server failed", "error", err)
 		}
 	}()
@@ -270,18 +282,33 @@ func (a *Application) Start(ctx context.Context) error {
 func (a *Application) Stop(ctx context.Context) error {
 	logger.Logger.Info("Application shutdown initiated")
 
+	var stopErr error
+
+	if a.Server != nil {
+		logger.Logger.Info("Stopping HTTP server")
+
+		if err := a.Server.Shutdown(ctx); err != nil {
+			logger.Logger.Error("Failed to stop HTTP server", "error", err)
+			stopErr = err
+		} else {
+			logger.Logger.Info("HTTP server stopped")
+		}
+	}
+
 	if a.database != nil {
 		logger.Logger.Info("Closing database connection")
 
 		if err := a.database.Close(); err != nil {
 			logger.Logger.Error("Failed to close database connection", "error", err)
-			return err
+			if stopErr == nil {
+				stopErr = err
+			}
+		} else {
+			logger.Logger.Info("Database connection closed")
 		}
-
-		logger.Logger.Info("Database connection closed")
 	}
 
 	logger.Logger.Info("HyperFulcrum application shutdown complete")
 
-	return nil
+	return stopErr
 }
