@@ -103,7 +103,7 @@ func (r *ProjectRepository) ProjectList(ctx context.Context) ([]Project, error) 
 	}
 	defer rows.Close()
 
-	var projects []Project
+	projects := make([]Project, 0)
 	for rows.Next() {
 		project := Project{}
 		err := rows.Scan(
@@ -235,7 +235,7 @@ func (r *ProjectRepository) ProjectGetReady(ctx context.Context) ([]Project, err
 	}
 	defer rows.Close()
 
-	var projects []Project
+	projects := make([]Project, 0)
 	for rows.Next() {
 		project := Project{}
 		err := rows.Scan(&project.ID,
@@ -255,8 +255,5 @@ func (r *ProjectRepository) ProjectGetReady(ctx context.Context) ([]Project, err
 		return nil, err
 	}
 
-	if len(projects) == 0 {
-		return nil, sql.ErrNoRows
-	}
 	return projects, nil
 }
