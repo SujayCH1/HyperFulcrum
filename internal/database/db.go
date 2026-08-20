@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 )
@@ -22,9 +23,9 @@ func NewDatabasePool(ctx context.Context) (*sql.DB, error) {
 		return nil, err
 	}
 
-	err = conn.Ping()
+	err = conn.PingContext(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, conn.Close())
 	}
 
 	return conn, err

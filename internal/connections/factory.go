@@ -3,6 +3,7 @@ package connections
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -14,8 +15,8 @@ func NewConnection(ctx context.Context, dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(30)
+	db.SetMaxIdleConns(15)
 	db.SetConnMaxLifetime(30 * time.Minute)
 	db.SetConnMaxIdleTime(10 * time.Minute)
 
@@ -23,8 +24,7 @@ func NewConnection(ctx context.Context, dsn string) (*sql.DB, error) {
 	defer cancel()
 
 	if err := db.PingContext(pingCtx); err != nil {
-		db.Close()
-		return nil, err
+		return nil, errors.Join(err, db.Close())
 	}
 	return db, nil
 }
