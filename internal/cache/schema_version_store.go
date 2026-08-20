@@ -11,11 +11,14 @@ type SchemaVersionStore struct {
 
 	// projectID -> SchemaVersion
 	data map[string]repository.SchemaVersion
+
+	loadedProjects map[string]bool
 }
 
 func NewSchemaVersionStore() *SchemaVersionStore {
 	return &SchemaVersionStore{
-		data: make(map[string]repository.SchemaVersion),
+		data:           make(map[string]repository.SchemaVersion),
+		loadedProjects: make(map[string]bool),
 	}
 }
 
@@ -26,6 +29,17 @@ func (s *SchemaVersionStore) Set(
 	defer s.mu.Unlock()
 
 	s.data[schema.ProjectID] = schema
+	s.loadedProjects[schema.ProjectID] = true
+}
+
+func (s *SchemaVersionStore) SetMissing(
+	projectID string,
+) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.data, projectID)
+	s.loadedProjects[projectID] = true
 }
 
 func (s *SchemaVersionStore) Get(
@@ -66,6 +80,7 @@ func (s *SchemaVersionStore) DeleteProject(
 	defer s.mu.Unlock()
 
 	delete(s.data, projectID)
+	delete(s.loadedProjects, projectID)
 }
 
 func (s *SchemaVersionStore) Exists(
@@ -80,10 +95,21 @@ func (s *SchemaVersionStore) Exists(
 	return ok
 }
 
+func (s *SchemaVersionStore) Loaded(
+	projectID string,
+) bool {
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.loadedProjects[projectID]
+}
+
 func (s *SchemaVersionStore) Clear() {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.data = make(map[string]repository.SchemaVersion)
+	s.loadedProjects = make(map[string]bool)
 }

@@ -13,12 +13,15 @@ type NodeStore struct {
 
 	// nodeID -> projectID
 	projectIndex map[string]string
+
+	loadedProjects map[string]bool
 }
 
 func NewNodeStore() *NodeStore {
 	return &NodeStore{
-		data:         make(map[string]map[string]repository.Node),
-		projectIndex: make(map[string]string),
+		data:           make(map[string]map[string]repository.Node),
+		projectIndex:   make(map[string]string),
+		loadedProjects: make(map[string]bool),
 	}
 }
 
@@ -32,6 +35,31 @@ func (s *NodeStore) Set(node repository.Node) {
 
 	s.data[node.ProjectID][node.ID] = node
 	s.projectIndex[node.ID] = node.ProjectID
+}
+
+func (s *NodeStore) ReplaceProject(
+	projectID string,
+	nodes []repository.Node,
+) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if projectNodes, ok := s.data[projectID]; ok {
+		for nodeID := range projectNodes {
+			delete(s.projectIndex, nodeID)
+		}
+	}
+
+	projectNodes := make(map[string]repository.Node, len(nodes))
+
+	for _, node := range nodes {
+		node.ProjectID = projectID
+		projectNodes[node.ID] = node
+		s.projectIndex[node.ID] = projectID
+	}
+
+	s.data[projectID] = projectNodes
+	s.loadedProjects[projectID] = true
 }
 
 func (s *NodeStore) Get(nodeID string) (repository.Node, bool) {
@@ -55,13 +83,13 @@ func (s *NodeStore) GetProjectID(nodeID string) (string, bool) {
 	return projectID, ok
 }
 
-func (s *NodeStore) GetByProject(projectID string) []repository.Node {
+func (s *NodeStore) GetByProject(projectID string) ([]repository.Node, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	projectNodes, ok := s.data[projectID]
 	if !ok {
-		return nil
+		return nil, s.loadedProjects[projectID]
 	}
 
 	nodes := make([]repository.Node, 0, len(projectNodes))
@@ -70,7 +98,7 @@ func (s *NodeStore) GetByProject(projectID string) []repository.Node {
 		nodes = append(nodes, node)
 	}
 
-	return nodes
+	return nodes, s.loadedProjects[projectID]
 }
 
 func (s *NodeStore) GetAll() []repository.Node {
@@ -111,15 +139,14 @@ func (s *NodeStore) DeleteProject(projectID string) {
 	defer s.mu.Unlock()
 
 	projectNodes, ok := s.data[projectID]
-	if !ok {
-		return
-	}
-
-	for nodeID := range projectNodes {
-		delete(s.projectIndex, nodeID)
+	if ok {
+		for nodeID := range projectNodes {
+			delete(s.projectIndex, nodeID)
+		}
 	}
 
 	delete(s.data, projectID)
+	delete(s.loadedProjects, projectID)
 }
 
 func (s *NodeStore) Exists(nodeID string) bool {
@@ -136,4 +163,5 @@ func (s *NodeStore) Clear() {
 
 	s.data = make(map[string]map[string]repository.Node)
 	s.projectIndex = make(map[string]string)
+	s.loadedProjects = make(map[string]bool)
 }

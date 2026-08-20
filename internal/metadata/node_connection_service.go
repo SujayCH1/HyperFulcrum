@@ -164,6 +164,10 @@ func (s *NodeConnectionService) GetConnectionByNodeID(
 		}
 	}
 
+	if s.cache.Connections.ProjectLoaded(projectID) {
+		return repository.NodeConnection{}, sql.ErrNoRows
+	}
+
 	if err := s.refresher.RefreshConnections(
 		ctx,
 		projectID,

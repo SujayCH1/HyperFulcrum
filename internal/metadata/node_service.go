@@ -62,8 +62,8 @@ func (s *NodeService) ListNodes(
 	projectID string,
 ) ([]repository.Node, error) {
 
-	nodes := s.cache.Nodes.GetByProject(projectID)
-	if len(nodes) > 0 {
+	nodes, loaded := s.cache.Nodes.GetByProject(projectID)
+	if loaded {
 		return nodes, nil
 	}
 
@@ -74,7 +74,9 @@ func (s *NodeService) ListNodes(
 		return nil, err
 	}
 
-	return s.cache.Nodes.GetByProject(projectID), nil
+	nodes, _ = s.cache.Nodes.GetByProject(projectID)
+
+	return nodes, nil
 }
 
 func (s *NodeService) RemoveNode(
