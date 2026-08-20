@@ -1,4 +1,4 @@
-FROM golang:1.25 AS builder
+FROM golang:1.25-bookworm AS builder
 
 WORKDIR /app
 
@@ -7,9 +7,9 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o hyperfulcrum ./cmd/hyperfulcrum
+RUN CGO_ENABLED=1 GOOS=linux go build -o hyperfulcrum ./cmd/hyperfulcrum
 
-FROM alpine:latest
+FROM debian:bookworm-slim
 
 WORKDIR /root/
 

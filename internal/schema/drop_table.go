@@ -11,16 +11,44 @@ func applyDropTable(
 	stmt *ir.DDLStatement,
 ) error {
 
-	tableName := stmt.Table.Name
-
-	if _, exists := schema.Tables[tableName]; !exists {
-		return fmt.Errorf(
-			"table %q does not exist",
-			tableName,
-		)
+	tables := stmt.Tables
+	if len(tables) == 0 {
+		tables = []ir.Table{stmt.Table}
 	}
 
-	delete(schema.Tables, tableName)
+	for _, target := range tables {
+		tableName := target.Key()
+
+		if _, exists := schema.Tables[tableName]; !exists {
+			if stmt.IfExists {
+				continue
+			}
+			return fmt.Errorf(
+				"table %q does not exist",
+				tableName,
+			)
+		}
+	}
+
+	for _, target := range tables {
+		tableName := target.Key()
+
+		if _, exists := schema.Tables[tableName]; !exists {
+			continue
+		}
+
+		delete(schema.Tables, tableName)
+
+		for _, table := range schema.Tables {
+			for name, constraint := range table.Constraints {
+				if constraint.Type == ir.ForeignKey &&
+					constraint.Reference != nil &&
+					constraint.Reference.Table.Key() == tableName {
+					delete(table.Constraints, name)
+				}
+			}
+		}
+	}
 
 	return nil
 }

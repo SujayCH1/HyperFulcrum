@@ -5,8 +5,8 @@ go 1.25.6
 require github.com/golang-migrate/migrate/v4 v4.19.1
 
 require (
-	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
 )
 
@@ -15,5 +15,4 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/pganalyze/pg_query_go/v5 v5.1.0
-	github.com/valkdb/postgresparser v1.3.2
 )
