@@ -31,13 +31,13 @@ func (h *NodeHandler) AddNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.service.AddNode(r.Context(), projectID, payload.Type, payload.Name)
+	node, err := h.service.AddNode(r.Context(), projectID, payload.Type, payload.Name)
 	if err != nil {
 		writeHandlerError(w, "Project not found", "Failed to add node", err)
 		return
 	}
 
-	utils.WriteJSONSuccessResponse(w, http.StatusCreated, "Node added successfully", nil)
+	utils.WriteJSONSuccessResponse(w, http.StatusCreated, "Node added successfully", node)
 }
 
 func (h *NodeHandler) ListNodes(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +61,7 @@ func (h *NodeHandler) RemoveNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteJSONSuccessResponse(w, http.StatusOK, "Node removed successfully", nil)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *NodeHandler) UpdateNodeName(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +79,7 @@ func (h *NodeHandler) UpdateNodeName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteJSONSuccessResponse(w, http.StatusOK, "Node name updated successfully", nil)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *NodeHandler) UpdateNodeStatus(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +103,7 @@ func (h *NodeHandler) UpdateNodeStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteJSONSuccessResponse(w, http.StatusOK, "Node status updated successfully", nil)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *NodeHandler) UpdateNodeType(w http.ResponseWriter, r *http.Request) {
@@ -121,5 +121,5 @@ func (h *NodeHandler) UpdateNodeType(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteJSONSuccessResponse(w, http.StatusOK, "Node type updated successfully", nil)
+	w.WriteHeader(http.StatusNoContent)
 }

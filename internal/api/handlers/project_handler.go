@@ -91,7 +91,7 @@ func (h *ProjectHandler) RemoveProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteJSONSuccessResponse(w, http.StatusOK, "Project removed successfully", nil)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *ProjectHandler) GetReadyProjects(w http.ResponseWriter, r *http.Request) {

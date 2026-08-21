@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"context"
+	"database/sql"
 
 	"hyperfulcrum/internal/repository"
 )
@@ -12,13 +13,40 @@ func (s *NodeService) validateAddNode(
 	nodeType string,
 	name string,
 ) error {
+	project, ok := s.cache.Projects.Get(projectID)
+	if !ok {
+		err := s.refresher.RefreshProject(ctx, projectID)
+		if err != nil {
+			return err
+		}
+		project, ok = s.cache.Projects.Get(projectID)
+	}
+	if !ok {
+		return sql.ErrNoRows
+	}
+	if project.Running {
+		return ErrProjectRunning
+	}
+	if nodeType != "shard" && nodeType != "replica" {
+		return ErrInvalidNodeType
+	}
 
-	// Future validations:
-	// - Ensure the project exists.
-	// - Ensure the project is inactive before modifying topology.
-	// - Ensure node type is valid.
-	// - Ensure node name is unique within the project.
-	// - Enforce project/node limits if introduced.
+	nodes, loaded := s.cache.Nodes.GetByProject(projectID)
+	if !loaded {
+		err := s.refresher.RefreshNodes(ctx, projectID)
+		if err != nil {
+			return err
+		}
+		nodes, _ = s.cache.Nodes.GetByProject(projectID)
+	}
+
+	for _, node := range nodes {
+		if node.Name == name {
+			return ErrDuplicateNodeName
+		}
+	}
+
+	// Project/node limits can be enforced when configured.
 
 	return nil
 }
@@ -27,14 +55,41 @@ func (s *NodeService) validateRemoveNode(
 	ctx context.Context,
 	node repository.Node,
 ) error {
+	if node.Status {
+		return ErrNodeActive
+	}
 
-	// Future validations:
-	// - Ensure the node is inactive.
-	// - Ensure the node is not a primary node.
-	// - Ensure no replicas depend on this node.
-	// - Ensure the node is not part of an active replication relationship.
-	// - Ensure the project is not currently active.
-	// - Ensure no agents are currently assigned.
+	project, ok := s.cache.Projects.Get(node.ProjectID)
+	if !ok {
+		err := s.refresher.RefreshProject(ctx, node.ProjectID)
+		if err != nil {
+			return err
+		}
+		project, ok = s.cache.Projects.Get(node.ProjectID)
+	}
+	if !ok {
+		return sql.ErrNoRows
+	}
+	if project.Running {
+		return ErrProjectRunning
+	}
+
+	topologies, loaded := s.cache.Topology.GetByProjectID(node.ProjectID)
+	if !loaded {
+		err := s.refresher.RefreshTopology(ctx, node.ProjectID)
+		if err != nil {
+			return err
+		}
+		topologies, _ = s.cache.Topology.GetByProjectID(node.ProjectID)
+	}
+
+	for _, topology := range topologies {
+		if topology.ShardNodeID == node.ID || topology.ReplicaNodeID == node.ID {
+			return ErrNodeInTopology
+		}
+	}
+
+	// Agent assignments can be checked when agents are implemented.
 
 	return nil
 }
@@ -44,12 +99,75 @@ func (s *NodeService) validateUpdateNodeStatus(
 	node repository.Node,
 	status bool,
 ) error {
+	if status {
+		_, ok := s.cache.Connections.Get(node.ID)
+		if !ok {
+			err := s.refresher.RefreshConnections(ctx, node.ProjectID)
+			if err != nil {
+				return err
+			}
+			_, ok = s.cache.Connections.Get(node.ID)
+		}
+		if !ok {
+			return ErrConnectionNotFound
+		}
+	}
 
-	// Future validations:
-	// - Prevent deactivating a required primary.
-	// - Prevent activating a node without a valid connection.
-	// - Ensure replication health before changing status.
-	// - Ensure topology remains valid after the status change.
+	if !status {
+		topologies, loaded := s.cache.Topology.GetByProjectID(node.ProjectID)
+		if !loaded {
+			err := s.refresher.RefreshTopology(ctx, node.ProjectID)
+			if err != nil {
+				return err
+			}
+			topologies, _ = s.cache.Topology.GetByProjectID(node.ProjectID)
+		}
+		for _, topology := range topologies {
+			if topology.ShardNodeID == node.ID || topology.ReplicaNodeID == node.ID {
+				return ErrNodeInTopology
+			}
+		}
+	}
+
+	// Replication health can be checked when replication is implemented.
+
+	return nil
+}
+
+func (s *NodeService) validateUpdateNodeName(
+	ctx context.Context,
+	node repository.Node,
+	name string,
+) error {
+	project, ok := s.cache.Projects.Get(node.ProjectID)
+	if !ok {
+		err := s.refresher.RefreshProject(ctx, node.ProjectID)
+		if err != nil {
+			return err
+		}
+		project, ok = s.cache.Projects.Get(node.ProjectID)
+	}
+	if !ok {
+		return sql.ErrNoRows
+	}
+	if project.Running {
+		return ErrProjectRunning
+	}
+
+	nodes, loaded := s.cache.Nodes.GetByProject(node.ProjectID)
+	if !loaded {
+		err := s.refresher.RefreshNodes(ctx, node.ProjectID)
+		if err != nil {
+			return err
+		}
+		nodes, _ = s.cache.Nodes.GetByProject(node.ProjectID)
+	}
+
+	for _, existingNode := range nodes {
+		if existingNode.ID != node.ID && existingNode.Name == name {
+			return ErrDuplicateNodeName
+		}
+	}
 
 	return nil
 }
@@ -59,12 +177,38 @@ func (s *NodeService) validateUpdateNodeType(
 	node repository.Node,
 	nodeType string,
 ) error {
+	if nodeType != "shard" && nodeType != "replica" {
+		return ErrInvalidNodeType
+	}
 
-	// Future validations:
-	// - Ensure the requested node type is valid.
-	// - Prevent invalid primary/replica transitions.
-	// - Ensure replication topology remains consistent.
-	// - Prevent changing type while the project is active.
+	project, ok := s.cache.Projects.Get(node.ProjectID)
+	if !ok {
+		err := s.refresher.RefreshProject(ctx, node.ProjectID)
+		if err != nil {
+			return err
+		}
+		project, ok = s.cache.Projects.Get(node.ProjectID)
+	}
+	if !ok {
+		return sql.ErrNoRows
+	}
+	if project.Running {
+		return ErrProjectRunning
+	}
+
+	topologies, loaded := s.cache.Topology.GetByProjectID(node.ProjectID)
+	if !loaded {
+		err := s.refresher.RefreshTopology(ctx, node.ProjectID)
+		if err != nil {
+			return err
+		}
+		topologies, _ = s.cache.Topology.GetByProjectID(node.ProjectID)
+	}
+	for _, topology := range topologies {
+		if topology.ShardNodeID == node.ID || topology.ReplicaNodeID == node.ID {
+			return ErrNodeInTopology
+		}
+	}
 
 	return nil
 }

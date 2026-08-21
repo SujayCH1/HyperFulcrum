@@ -8,6 +8,7 @@ import (
 
 	"github.com/lib/pq"
 
+	"hyperfulcrum/internal/metadata"
 	"hyperfulcrum/pkg/logger"
 	"hyperfulcrum/pkg/utils"
 )
@@ -25,6 +26,29 @@ func writeHandlerError(
 
 	if errors.Is(err, sql.ErrNoRows) {
 		utils.WriteJSONErrorResponse(w, http.StatusNotFound, notFoundMessage, nil)
+		return
+	}
+
+	if errors.Is(err, metadata.ErrInvalidNodeType) ||
+		errors.Is(err, metadata.ErrInvalidConnection) ||
+		errors.Is(err, metadata.ErrTopologySelfRelation) ||
+		errors.Is(err, metadata.ErrTopologyRoleMismatch) {
+		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, message, nil)
+		return
+	}
+
+	if errors.Is(err, metadata.ErrProjectRunning) ||
+		errors.Is(err, metadata.ErrProjectHasNodes) ||
+		errors.Is(err, metadata.ErrProjectHasTopology) ||
+		errors.Is(err, metadata.ErrDuplicateNodeName) ||
+		errors.Is(err, metadata.ErrNodeActive) ||
+		errors.Is(err, metadata.ErrNodeInTopology) ||
+		errors.Is(err, metadata.ErrConnectionExists) ||
+		errors.Is(err, metadata.ErrConnectionNotFound) ||
+		errors.Is(err, metadata.ErrReplicaAlreadyUsed) ||
+		errors.Is(err, metadata.ErrShardIsReplica) ||
+		errors.Is(err, metadata.ErrDuplicateTopology) {
+		utils.WriteJSONErrorResponse(w, http.StatusConflict, message, nil)
 		return
 	}
 

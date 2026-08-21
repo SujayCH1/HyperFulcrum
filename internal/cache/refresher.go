@@ -15,6 +15,7 @@ type CacheRefresher struct {
 	columnRepo        *repository.ColumnRepository
 	fkRepo            *repository.FKEdgesRepository
 	schemaVersionRepo *repository.SchemaVersionRepository
+	shardKeyRepo      *repository.ShardKeyRepository
 
 	cache *CacheManager
 }
@@ -27,6 +28,7 @@ type projectMetadata struct {
 	columns       []repository.Column
 	edges         []repository.FkEdges
 	schemaVersion *repository.SchemaVersion
+	shardKeys     []repository.ShardKey
 }
 
 func NewCacheRefresher(
@@ -37,6 +39,7 @@ func NewCacheRefresher(
 	columnRepo *repository.ColumnRepository,
 	fkRepo *repository.FKEdgesRepository,
 	schemaVersionRepo *repository.SchemaVersionRepository,
+	shardKeyRepo *repository.ShardKeyRepository,
 	cache *CacheManager,
 ) *CacheRefresher {
 
@@ -48,6 +51,7 @@ func NewCacheRefresher(
 		columnRepo:        columnRepo,
 		fkRepo:            fkRepo,
 		schemaVersionRepo: schemaVersionRepo,
+		shardKeyRepo:      shardKeyRepo,
 		cache:             cache,
 	}
 }
@@ -280,6 +284,21 @@ func (r *CacheRefresher) RefreshSchemaVersion(
 	return nil
 }
 
+func (r *CacheRefresher) RefreshShardKeys(
+	ctx context.Context,
+	projectID string,
+) error {
+
+	keys, err := r.shardKeyRepo.FetchShardKeys(ctx, projectID)
+	if err != nil {
+		return err
+	}
+
+	r.cache.ShardKeys.ReplaceProject(projectID, keys)
+
+	return nil
+}
+
 func (r *CacheRefresher) fetchProjectMetadata(
 	ctx context.Context,
 	project repository.Project,
@@ -313,6 +332,11 @@ func (r *CacheRefresher) fetchProjectMetadata(
 		return projectMetadata{}, err
 	}
 
+	shardKeys, err := r.shardKeyRepo.FetchShardKeys(ctx, project.ID)
+	if err != nil {
+		return projectMetadata{}, err
+	}
+
 	schemaVersion, err := r.schemaVersionRepo.FetchSchema(ctx, project.ID)
 	if err != nil && err != sql.ErrNoRows {
 		return projectMetadata{}, err
@@ -325,6 +349,7 @@ func (r *CacheRefresher) fetchProjectMetadata(
 		topologies:  topologies,
 		columns:     columns,
 		edges:       edges,
+		shardKeys:   shardKeys,
 	}
 
 	if err == nil {
@@ -346,6 +371,7 @@ func (r *CacheRefresher) storeProjectMetadata(
 	r.cache.Topology.Set(projectID, metadata.topologies)
 	r.cache.Columns.ReplaceProject(projectID, metadata.columns)
 	r.cache.FKEdges.ReplaceProject(projectID, metadata.edges)
+	r.cache.ShardKeys.ReplaceProject(projectID, metadata.shardKeys)
 
 	if metadata.schemaVersion == nil {
 		r.cache.SchemaVersion.SetMissing(projectID)

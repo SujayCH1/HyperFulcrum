@@ -26,14 +26,36 @@ func NewNodeConnectionRepository(connConfig *sql.DB) *NodeConnectionRepository {
 	return &NodeConnectionRepository{conn: connConfig}
 }
 
-func (r *NodeConnectionRepository) ConnectionAdd(ctx context.Context, node_conn *NodeConnection) error {
+func (r *NodeConnectionRepository) ConnectionAdd(
+	ctx context.Context,
+	connection NodeConnection,
+) (NodeConnection, error) {
 
-	query := `INSERT INTO node_connections (node_id,host,port,database_name,username,password) VALUES ($1,$2,$3,$4,$5,$6)`
-	_, err := r.conn.ExecContext(ctx, query, node_conn.NodeId, node_conn.Host, node_conn.Port, node_conn.DatabaseName, node_conn.Username, node_conn.Password)
+	query := `
+		INSERT INTO node_connections
+		(node_id, host, port, database_name, username, password)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING created_at, updated_at
+	`
+
+	err := r.conn.QueryRowContext(
+		ctx,
+		query,
+		connection.NodeId,
+		connection.Host,
+		connection.Port,
+		connection.DatabaseName,
+		connection.Username,
+		connection.Password,
+	).Scan(
+		&connection.CreatedAt,
+		&connection.UpdatedAt,
+	)
 	if err != nil {
-		return err
+		return NodeConnection{}, err
 	}
-	return nil
+
+	return connection, nil
 }
 
 func (r *NodeConnectionRepository) ConnectionRemove(ctx context.Context, nodeId string) error {

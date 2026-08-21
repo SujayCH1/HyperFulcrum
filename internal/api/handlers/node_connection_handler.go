@@ -39,9 +39,9 @@ func (s *NodeConnectionHandler) AddNodeConnection(w http.ResponseWriter, r *http
 	nodeConnection.Username = payload.Username
 	nodeConnection.Password = payload.Password
 
-	err := s.service.AddConnection(
+	createdConnection, err := s.service.AddConnection(
 		r.Context(),
-		&nodeConnection,
+		nodeConnection,
 	)
 
 	if err != nil {
@@ -53,7 +53,7 @@ func (s *NodeConnectionHandler) AddNodeConnection(w http.ResponseWriter, r *http
 		w,
 		http.StatusCreated,
 		"Node connection successfully added",
-		dto.NewNodeConnectionResponse(nodeConnection),
+		dto.NewNodeConnectionResponse(createdConnection),
 	)
 }
 
@@ -67,7 +67,7 @@ func (s *NodeConnectionHandler) RemoveNodeConnection(w http.ResponseWriter, r *h
 		return
 	}
 
-	utils.WriteJSONSuccessResponse(w, http.StatusOK, "Node connection successfully removed", nil)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *NodeConnectionHandler) UpdateNodeConnection(w http.ResponseWriter, r *http.Request) {
@@ -93,12 +93,7 @@ func (s *NodeConnectionHandler) UpdateNodeConnection(w http.ResponseWriter, r *h
 		return
 	}
 
-	utils.WriteJSONSuccessResponse(
-		w,
-		http.StatusOK,
-		"Node connection successfully updated",
-		dto.NewNodeConnectionResponse(nodeConnection),
-	)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *NodeConnectionHandler) GetNodeConnectionByID(w http.ResponseWriter, r *http.Request) {
