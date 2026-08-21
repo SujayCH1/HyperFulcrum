@@ -2,7 +2,7 @@ package metadata
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/repository"
 )
@@ -143,5 +143,5 @@ func (s *TopologyService) GetTopologyByID(
 		}
 	}
 
-	return repository.NodeTopology{}, fmt.Errorf("topology not found")
+	return repository.NodeTopology{}, sql.ErrNoRows
 }

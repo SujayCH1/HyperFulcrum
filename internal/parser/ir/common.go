@@ -32,7 +32,7 @@ const (
 	Insert Command = "INSERT"
 	Update Command = "UPDATE"
 	Delete Command = "DELETE"
-	Merge  Command = "MERGE" // not yet convertible — see converter.go note
+	Merge  Command = "MERGE"
 
 	// TCL
 	Begin    Command = "BEGIN"

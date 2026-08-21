@@ -31,12 +31,18 @@ func (r *SchemaVersionRepository) ReplaceSchema(
 	projectID string,
 	rawSQL string,
 ) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	query1 := `
 		DELETE FROM schema_versions
 		WHERE project_id = $1
 	`
 
-	_, err := r.db.ExecContext(
+	_, err = tx.ExecContext(
 		ctx,
 		query1,
 		projectID,
@@ -51,20 +57,22 @@ func (r *SchemaVersionRepository) ReplaceSchema(
 		VALUES ($1, $2, $3, $4, $5)
 	`
 
-	_, err = r.db.ExecContext(
+	now := time.Now()
+
+	_, err = tx.ExecContext(
 		ctx,
 		query2,
 		uuid.New(),
 		projectID,
 		rawSQL,
-		time.Now(),
-		time.Now(),
+		now,
+		now,
 	)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return tx.Commit()
 
 }
 
@@ -95,10 +103,6 @@ func (s *SchemaVersionRepository) FetchSchema(
 		&schema.UpdatedAt,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return SchemaVersion{}, nil
-		}
-
 		return SchemaVersion{}, err
 	}
 
@@ -110,17 +114,26 @@ func (r *SchemaVersionRepository) DeleteSchema(
 	projectID string,
 ) error {
 	query := `
-		DELETE FROM project_schema
+		DELETE FROM schema_versions
 		WHERE project_id = $1
 	`
 
-	_, err := r.db.ExecContext(
+	res, err := r.db.ExecContext(
 		ctx,
 		query,
 		projectID,
 	)
 	if err != nil {
 		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return sql.ErrNoRows
 	}
 
 	return nil

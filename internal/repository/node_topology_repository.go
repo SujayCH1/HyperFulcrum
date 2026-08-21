@@ -84,13 +84,25 @@ func (r *NodeTopologyRepository) TopologyRemove(
 		WHERE relation_id = $1
 	`
 
-	_, err := r.conn.ExecContext(
+	res, err := r.conn.ExecContext(
 		ctx,
 		query,
 		relationID,
 	)
+	if err != nil {
+		return err
+	}
 
-	return err
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }
 
 func (r *NodeTopologyRepository) TopologyUpdate(
@@ -110,7 +122,7 @@ func (r *NodeTopologyRepository) TopologyUpdate(
 		WHERE relation_id = $1
 	`
 
-	_, err := r.conn.ExecContext(
+	res, err := r.conn.ExecContext(
 		ctx,
 		query,
 		relationID,
@@ -118,8 +130,20 @@ func (r *NodeTopologyRepository) TopologyUpdate(
 		shardID,
 		replicaID,
 	)
+	if err != nil {
+		return err
+	}
 
-	return err
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }
 
 func (r *NodeTopologyRepository) TopologyGetAll(
@@ -148,7 +172,7 @@ func (r *NodeTopologyRepository) TopologyGetAll(
 	}
 	defer rows.Close()
 
-	var topologies []NodeTopology
+	topologies := make([]NodeTopology, 0)
 
 	for rows.Next() {
 
@@ -233,7 +257,7 @@ func (r *NodeTopologyRepository) GetReplicasForShard(
 	}
 	defer rows.Close()
 
-	var replicas []string
+	replicas := make([]string, 0)
 
 	for rows.Next() {
 
@@ -270,7 +294,7 @@ func (r *NodeTopologyRepository) GetAllMappings(
 	}
 	defer rows.Close()
 
-	var mappings []NodeTopology
+	mappings := make([]NodeTopology, 0)
 
 	for rows.Next() {
 

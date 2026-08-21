@@ -6,8 +6,9 @@ import (
 )
 
 type ProjectStore struct {
-	mu   sync.RWMutex
-	data map[string]repository.Project
+	mu     sync.RWMutex
+	data   map[string]repository.Project
+	loaded bool
 }
 
 func NewProjectStore() *ProjectStore {
@@ -23,6 +24,20 @@ func (s *ProjectStore) Set(project repository.Project) {
 	s.data[project.ID] = project
 }
 
+func (s *ProjectStore) Replace(projects []repository.Project) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	data := make(map[string]repository.Project, len(projects))
+
+	for _, project := range projects {
+		data[project.ID] = project
+	}
+
+	s.data = data
+	s.loaded = true
+}
+
 func (s *ProjectStore) Get(projectID string) (repository.Project, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -31,7 +46,7 @@ func (s *ProjectStore) Get(projectID string) (repository.Project, bool) {
 	return project, ok
 }
 
-func (s *ProjectStore) GetAll() []repository.Project {
+func (s *ProjectStore) GetAll() ([]repository.Project, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -41,7 +56,7 @@ func (s *ProjectStore) GetAll() []repository.Project {
 		projects = append(projects, project)
 	}
 
-	return projects
+	return projects, s.loaded
 }
 
 func (s *ProjectStore) Delete(projectID string) {
@@ -59,9 +74,17 @@ func (s *ProjectStore) Exists(projectID string) bool {
 	return ok
 }
 
+func (s *ProjectStore) Loaded() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.loaded
+}
+
 func (s *ProjectStore) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.data = make(map[string]repository.Project)
+	s.loaded = false
 }

@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"sort"
+
 	"hyperfulcrum/internal/parser/ir"
 	"hyperfulcrum/internal/repository"
 )
@@ -20,8 +22,14 @@ func flattenColumns(
 ) []repository.Column {
 
 	var columns []repository.Column
+	tableNames := make([]string, 0, len(schema.Tables))
+	for tableName := range schema.Tables {
+		tableNames = append(tableNames, tableName)
+	}
+	sort.Strings(tableNames)
 
-	for tableName, table := range schema.Tables {
+	for _, tableName := range tableNames {
+		table := schema.Tables[tableName]
 
 		primaryKeys := make(map[string]struct{})
 
@@ -36,7 +44,14 @@ func flattenColumns(
 			}
 		}
 
-		for _, column := range table.Columns {
+		columnNames := make([]string, 0, len(table.Columns))
+		for columnName := range table.Columns {
+			columnNames = append(columnNames, columnName)
+		}
+		sort.Strings(columnNames)
+
+		for _, columnName := range columnNames {
+			column := table.Columns[columnName]
 
 			_, isPrimaryKey := primaryKeys[column.Name]
 
@@ -44,7 +59,7 @@ func flattenColumns(
 				ProjectID:  schema.ProjectID,
 				TableName:  tableName,
 				ColumnName: column.Name,
-				DataType:   column.DataType.Name,
+				DataType:   column.DataType.String(),
 				IsNullable: column.Nullable,
 				IsPk:       isPrimaryKey,
 			})
@@ -59,8 +74,14 @@ func flattenFKEdges(
 ) []repository.FkEdges {
 
 	var edges []repository.FkEdges
+	tableNames := make([]string, 0, len(schema.Tables))
+	for tableName := range schema.Tables {
+		tableNames = append(tableNames, tableName)
+	}
+	sort.Strings(tableNames)
 
-	for tableName, table := range schema.Tables {
+	for _, tableName := range tableNames {
+		table := schema.Tables[tableName]
 
 		for _, constraint := range table.Constraints {
 
@@ -80,7 +101,7 @@ func flattenFKEdges(
 
 				edges = append(edges, repository.FkEdges{
 					ProjectId:    schema.ProjectID,
-					ParentTable:  constraint.Reference.Table,
+					ParentTable:  constraint.Reference.Table.Key(),
 					ParentColumn: constraint.Reference.Columns[i],
 					ChildTable:   tableName,
 					ChildColumn:  childColumn,
@@ -88,6 +109,21 @@ func flattenFKEdges(
 			}
 		}
 	}
+
+	sort.Slice(edges, func(i, j int) bool {
+		left := edges[i]
+		right := edges[j]
+		if left.ChildTable != right.ChildTable {
+			return left.ChildTable < right.ChildTable
+		}
+		if left.ChildColumn != right.ChildColumn {
+			return left.ChildColumn < right.ChildColumn
+		}
+		if left.ParentTable != right.ParentTable {
+			return left.ParentTable < right.ParentTable
+		}
+		return left.ParentColumn < right.ParentColumn
+	})
 
 	return edges
 }

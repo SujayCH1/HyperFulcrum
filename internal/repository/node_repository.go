@@ -86,6 +86,25 @@ func (r *NodeRepository) NodeList(
 }
 
 func (r *NodeRepository) NodeAdd(ctx context.Context, projectID string, nodeType string, nodeName string) error {
+	tx, err := r.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	queryProject := `
+		SELECT id
+		FROM projects
+		WHERE id = $1
+		FOR UPDATE
+	`
+
+	var project string
+	err = tx.QueryRowContext(ctx, queryProject, projectID).Scan(&project)
+	if err != nil {
+		return err
+	}
+
 	var index int
 
 	queryIndex := `
@@ -94,7 +113,7 @@ func (r *NodeRepository) NodeAdd(ctx context.Context, projectID string, nodeType
 		WHERE project_id = $1
 	`
 
-	err := r.conn.QueryRowContext(ctx, queryIndex, projectID).Scan(&index)
+	err = tx.QueryRowContext(ctx, queryIndex, projectID).Scan(&index)
 	if err != nil {
 		return err
 	}
@@ -105,7 +124,7 @@ func (r *NodeRepository) NodeAdd(ctx context.Context, projectID string, nodeType
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 
-	_, err = r.conn.ExecContext(
+	_, err = tx.ExecContext(
 		ctx,
 		query,
 		uuid.New(),
@@ -119,7 +138,7 @@ func (r *NodeRepository) NodeAdd(ctx context.Context, projectID string, nodeType
 		return err
 	}
 
-	return nil
+	return tx.Commit()
 
 }
 
@@ -181,7 +200,7 @@ func (r *NodeRepository) NodeUpdateName(ctx context.Context, nodeID string, name
 		WHERE id = $2
 	`
 
-	_, err := r.conn.ExecContext(
+	res, err := r.conn.ExecContext(
 		ctx,
 		query,
 		name,
@@ -189,6 +208,15 @@ func (r *NodeRepository) NodeUpdateName(ctx context.Context, nodeID string, name
 	)
 	if err != nil {
 		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return sql.ErrNoRows
 	}
 
 	return nil

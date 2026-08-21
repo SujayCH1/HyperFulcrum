@@ -41,7 +41,7 @@ func (e *FKEdgesRepository) EdgesListByProjectID(
 	}
 	defer rows.Close()
 
-	var result []FkEdges
+	result := make([]FkEdges, 0)
 	for rows.Next() {
 		var temp FkEdges
 		err = rows.Scan(
@@ -79,7 +79,7 @@ func (e *FKEdgesRepository) EdgesListByChildTable(
 		return nil, err
 	}
 	defer rows.Close()
-	var result []FkEdges
+	result := make([]FkEdges, 0)
 	for rows.Next() {
 		var temp FkEdges
 		err = rows.Scan(
@@ -118,7 +118,7 @@ func (e *FKEdgesRepository) EdgesListByParentTable(
 	}
 	defer rows.Close()
 
-	var result []FkEdges
+	result := make([]FkEdges, 0)
 	for rows.Next() {
 		var temp FkEdges
 		err = rows.Scan(
@@ -194,7 +194,7 @@ func (e *FKEdgesRepository) FKEdgesReplaceForProject(
 		_, err = tx.ExecContext(
 			ctx,
 			insertQuery,
-			edge.ProjectId,
+			projectID,
 			edge.ParentTable,
 			edge.ParentColumn,
 			edge.ChildTable,

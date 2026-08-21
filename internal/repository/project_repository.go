@@ -103,7 +103,7 @@ func (r *ProjectRepository) ProjectList(ctx context.Context) ([]Project, error) 
 	}
 	defer rows.Close()
 
-	var projects []Project
+	projects := make([]Project, 0)
 	for rows.Next() {
 		project := Project{}
 		err := rows.Scan(
@@ -235,7 +235,7 @@ func (r *ProjectRepository) ProjectGetReady(ctx context.Context) ([]Project, err
 	}
 	defer rows.Close()
 
-	var projects []Project
+	projects := make([]Project, 0)
 	for rows.Next() {
 		project := Project{}
 		err := rows.Scan(&project.ID,
@@ -255,8 +255,31 @@ func (r *ProjectRepository) ProjectGetReady(ctx context.Context) ([]Project, err
 		return nil, err
 	}
 
-	if len(projects) == 0 {
-		return nil, sql.ErrNoRows
-	}
 	return projects, nil
+}
+
+func (r *ProjectRepository) ProjectGetRunning(ctx context.Context) (Project, error) {
+	query := `
+		SELECT id, name, description, node_count, ready, running, created_at, updated_at
+		FROM projects
+		WHERE running = TRUE
+	`
+
+	var project Project
+
+	err := r.conn.QueryRowContext(ctx, query).Scan(
+		&project.ID,
+		&project.Name,
+		&project.Description,
+		&project.NodeCount,
+		&project.Ready,
+		&project.Running,
+		&project.CreatedAt,
+		&project.UpdatedAt,
+	)
+	if err != nil {
+		return Project{}, err
+	}
+
+	return project, nil
 }

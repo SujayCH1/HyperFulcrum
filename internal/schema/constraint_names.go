@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strings"
 
 	"hyperfulcrum/internal/parser/ir"
@@ -31,7 +32,7 @@ func ensureConstraintName(
 		ref := ""
 
 		if constraint.Reference != nil {
-			ref = constraint.Reference.Table
+			ref = constraint.Reference.Table.Key()
 		}
 
 		constraint.Name = fmt.Sprintf(
@@ -50,11 +51,15 @@ func ensureConstraintName(
 		)
 
 	case ir.Check:
+		hash := fnv.New32a()
+		if constraint.Expression != nil {
+			_, _ = hash.Write([]byte(constraint.Expression.Raw))
+		}
 
 		constraint.Name = fmt.Sprintf(
-			"chk_%s_%d",
+			"chk_%s_%x",
 			tableName,
-			len(constraint.Columns),
+			hash.Sum32(),
 		)
 
 	case ir.Default:

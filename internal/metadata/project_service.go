@@ -3,27 +3,32 @@ package metadata
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"hyperfulcrum/internal/cache"
+	"hyperfulcrum/internal/connections"
 	"hyperfulcrum/internal/repository"
 )
 
 type ProjectService struct {
-	repo      *repository.ProjectRepository
-	cache     *cache.CacheManager
-	refresher *cache.CacheRefresher
+	repo              *repository.ProjectRepository
+	cache             *cache.CacheManager
+	refresher         *cache.CacheRefresher
+	connectionManager *connections.ConnectionManager
 }
 
 func NewProjectService(
 	repo *repository.ProjectRepository,
 	cache *cache.CacheManager,
 	refresher *cache.CacheRefresher,
+	connectionManager *connections.ConnectionManager,
 ) *ProjectService {
 
 	return &ProjectService{
-		repo:      repo,
-		cache:     cache,
-		refresher: refresher,
+		repo:              repo,
+		cache:             cache,
+		refresher:         refresher,
+		connectionManager: connectionManager,
 	}
 }
 
@@ -53,9 +58,9 @@ func (s *ProjectService) ListProjects(
 	ctx context.Context,
 ) ([]repository.Project, error) {
 
-	projects := s.cache.Projects.GetAll()
+	projects, loaded := s.cache.Projects.GetAll()
 
-	if len(projects) > 0 {
+	if loaded {
 		return projects, nil
 	}
 
@@ -63,7 +68,9 @@ func (s *ProjectService) ListProjects(
 		return nil, err
 	}
 
-	return s.cache.Projects.GetAll(), nil
+	projects, _ = s.cache.Projects.GetAll()
+
+	return projects, nil
 }
 
 func (s *ProjectService) GetProjectByID(
@@ -74,6 +81,10 @@ func (s *ProjectService) GetProjectByID(
 	project, ok := s.cache.Projects.Get(projectID)
 	if ok {
 		return project, nil
+	}
+
+	if s.cache.Projects.Loaded() {
+		return repository.Project{}, sql.ErrNoRows
 	}
 
 	if err := s.refresher.RefreshProject(
@@ -110,7 +121,13 @@ func (s *ProjectService) DeleteProject(
 		return err
 	}
 
-	return s.refresher.RefreshProjects(ctx)
+	connectionErr := s.connectionManager.RemoveProject(projectID)
+	s.cache.DeleteProject(projectID)
+
+	return errors.Join(
+		connectionErr,
+		s.refresher.RefreshProjects(ctx),
+	)
 }
 
 func (s *ProjectService) GetReadyProjects(

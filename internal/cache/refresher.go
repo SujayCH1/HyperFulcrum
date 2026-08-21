@@ -19,6 +19,16 @@ type CacheRefresher struct {
 	cache *CacheManager
 }
 
+type projectMetadata struct {
+	project       repository.Project
+	nodes         []repository.Node
+	connections   []repository.NodeConnection
+	topologies    []repository.NodeTopology
+	columns       []repository.Column
+	edges         []repository.FkEdges
+	schemaVersion *repository.SchemaVersion
+}
+
 func NewCacheRefresher(
 	projectRepo *repository.ProjectRepository,
 	nodeRepo *repository.NodeRepository,
@@ -47,29 +57,25 @@ func (r *CacheRefresher) RefreshProjectMetadata(
 	projectID string,
 ) error {
 
-	if err := r.RefreshProject(ctx, projectID); err != nil {
+	project, err := r.projectRepo.ProjectGetByID(
+		ctx,
+		projectID,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			r.cache.DeleteProject(projectID)
+			return nil
+		}
+
 		return err
 	}
 
-	if err := r.RefreshNodes(ctx, projectID); err != nil {
+	metadata, err := r.fetchProjectMetadata(ctx, project)
+	if err != nil {
 		return err
 	}
 
-	if err := r.RefreshConnections(ctx, projectID); err != nil {
-		return err
-	}
-
-	if err := r.RefreshTopology(ctx, projectID); err != nil {
-		return err
-	}
-
-	if err := r.RefreshColumns(ctx, projectID); err != nil {
-		return err
-	}
-
-	if err := r.RefreshFKEdges(ctx, projectID); err != nil {
-		return err
-	}
+	r.storeProjectMetadata(metadata)
 
 	return nil
 }
@@ -83,11 +89,22 @@ func (r *CacheRefresher) RefreshProjects(
 		return err
 	}
 
-	r.cache.Projects.Clear()
+	cachedProjects, loaded := r.cache.Projects.GetAll()
+	if loaded {
+		projectIDs := make(map[string]bool, len(projects))
 
-	for _, project := range projects {
-		r.cache.Projects.Set(project)
+		for _, project := range projects {
+			projectIDs[project.ID] = true
+		}
+
+		for _, project := range cachedProjects {
+			if !projectIDs[project.ID] {
+				r.cache.DeleteProject(project.ID)
+			}
+		}
 	}
+
+	r.cache.Projects.Replace(projects)
 
 	return nil
 }
@@ -104,7 +121,7 @@ func (r *CacheRefresher) RefreshProject(
 	if err != nil {
 
 		if err == sql.ErrNoRows {
-			r.cache.Projects.Delete(projectID)
+			r.cache.DeleteProject(projectID)
 			return nil
 		}
 
@@ -129,11 +146,7 @@ func (r *CacheRefresher) RefreshNodes(
 		return err
 	}
 
-	r.cache.Nodes.DeleteProject(projectID)
-
-	for _, node := range nodes {
-		r.cache.Nodes.Set(node)
-	}
+	r.cache.Nodes.ReplaceProject(projectID, nodes)
 
 	return nil
 }
@@ -143,7 +156,7 @@ func (r *CacheRefresher) RefreshConnections(
 	projectID string,
 ) error {
 
-	nodes, err := r.nodeRepo.NodeList(
+	connections, err := r.connectionRepo.ConnectionsListByProjectID(
 		ctx,
 		projectID,
 	)
@@ -151,26 +164,7 @@ func (r *CacheRefresher) RefreshConnections(
 		return err
 	}
 
-	r.cache.Connections.DeleteProject(projectID)
-
-	for _, node := range nodes {
-
-		conn, err := r.connectionRepo.GetConnectionByNodeId(
-			ctx,
-			node.ID,
-		)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				continue
-			}
-			return err
-		}
-
-		r.cache.Connections.Set(
-			projectID,
-			conn,
-		)
-	}
+	r.cache.Connections.ReplaceProject(projectID, connections)
 
 	return nil
 }
@@ -205,46 +199,22 @@ func (r *CacheRefresher) RefreshAllProjects(
 		return err
 	}
 
-	r.cache.Projects.Clear()
+	metadata := make([]projectMetadata, 0, len(projects))
 
 	for _, project := range projects {
-
-		r.cache.Projects.Set(project)
-
-		if err := r.RefreshNodes(
-			ctx,
-			project.ID,
-		); err != nil {
+		snapshot, err := r.fetchProjectMetadata(ctx, project)
+		if err != nil {
 			return err
 		}
 
-		if err := r.RefreshConnections(
-			ctx,
-			project.ID,
-		); err != nil {
-			return err
-		}
+		metadata = append(metadata, snapshot)
+	}
 
-		if err := r.RefreshTopology(
-			ctx,
-			project.ID,
-		); err != nil {
-			return err
-		}
+	r.cache.Clear()
+	r.cache.Projects.Replace(projects)
 
-		if err := r.RefreshColumns(
-			ctx,
-			project.ID,
-		); err != nil {
-			return err
-		}
-
-		if err := r.RefreshFKEdges(
-			ctx,
-			project.ID,
-		); err != nil {
-			return err
-		}
+	for _, snapshot := range metadata {
+		r.storeProjectMetadata(snapshot)
 	}
 
 	return nil
@@ -263,11 +233,7 @@ func (r *CacheRefresher) RefreshColumns(
 		return err
 	}
 
-	r.cache.Columns.DeleteProject(projectID)
-
-	for _, col := range columns {
-		r.cache.Columns.Set(col)
-	}
+	r.cache.Columns.ReplaceProject(projectID, columns)
 
 	return nil
 }
@@ -285,11 +251,7 @@ func (r *CacheRefresher) RefreshFKEdges(
 		return err
 	}
 
-	r.cache.FKEdges.DeleteProject(projectID)
-
-	for _, edge := range edges {
-		r.cache.FKEdges.Set(edge)
-	}
+	r.cache.FKEdges.ReplaceProject(projectID, edges)
 
 	return nil
 }
@@ -306,7 +268,7 @@ func (r *CacheRefresher) RefreshSchemaVersion(
 	if err != nil {
 
 		if err == sql.ErrNoRows {
-			r.cache.SchemaVersion.DeleteProject(projectID)
+			r.cache.SchemaVersion.SetMissing(projectID)
 			return nil
 		}
 
@@ -316,4 +278,79 @@ func (r *CacheRefresher) RefreshSchemaVersion(
 	r.cache.SchemaVersion.Set(schema)
 
 	return nil
+}
+
+func (r *CacheRefresher) fetchProjectMetadata(
+	ctx context.Context,
+	project repository.Project,
+) (projectMetadata, error) {
+
+	nodes, err := r.nodeRepo.NodeList(ctx, project.ID)
+	if err != nil {
+		return projectMetadata{}, err
+	}
+
+	connections, err := r.connectionRepo.ConnectionsListByProjectID(
+		ctx,
+		project.ID,
+	)
+	if err != nil {
+		return projectMetadata{}, err
+	}
+
+	topologies, err := r.topologyRepo.TopologyGetAll(ctx, project.ID)
+	if err != nil {
+		return projectMetadata{}, err
+	}
+
+	columns, err := r.columnRepo.ColumnsListByProjectID(ctx, project.ID)
+	if err != nil {
+		return projectMetadata{}, err
+	}
+
+	edges, err := r.fkRepo.EdgesListByProjectID(ctx, project.ID)
+	if err != nil {
+		return projectMetadata{}, err
+	}
+
+	schemaVersion, err := r.schemaVersionRepo.FetchSchema(ctx, project.ID)
+	if err != nil && err != sql.ErrNoRows {
+		return projectMetadata{}, err
+	}
+
+	metadata := projectMetadata{
+		project:     project,
+		nodes:       nodes,
+		connections: connections,
+		topologies:  topologies,
+		columns:     columns,
+		edges:       edges,
+	}
+
+	if err == nil {
+		metadata.schemaVersion = &schemaVersion
+	}
+
+	return metadata, nil
+}
+
+func (r *CacheRefresher) storeProjectMetadata(
+	metadata projectMetadata,
+) {
+
+	projectID := metadata.project.ID
+
+	r.cache.Projects.Set(metadata.project)
+	r.cache.Nodes.ReplaceProject(projectID, metadata.nodes)
+	r.cache.Connections.ReplaceProject(projectID, metadata.connections)
+	r.cache.Topology.Set(projectID, metadata.topologies)
+	r.cache.Columns.ReplaceProject(projectID, metadata.columns)
+	r.cache.FKEdges.ReplaceProject(projectID, metadata.edges)
+
+	if metadata.schemaVersion == nil {
+		r.cache.SchemaVersion.SetMissing(projectID)
+		return
+	}
+
+	r.cache.SchemaVersion.Set(*metadata.schemaVersion)
 }

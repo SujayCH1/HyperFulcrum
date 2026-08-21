@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"hyperfulcrum/internal/metadata"
+	"hyperfulcrum/internal/parser"
 	"hyperfulcrum/internal/parser/ir"
 )
 
@@ -25,19 +26,14 @@ func NewSchemaService(
 	}
 }
 
-// main orchestraction function
 func (s *SchemaService) ApplyProjectDDL(
 	ctx context.Context,
 	projectID string,
 	rawSQL string,
-	batch *ir.Batch,
 ) error {
 
-	if err := s.StoreRawDDL(
-		ctx,
-		projectID,
-		rawSQL,
-	); err != nil {
+	batch, err := parser.ParseDDLBatch(rawSQL)
+	if err != nil {
 		return err
 	}
 
@@ -49,10 +45,10 @@ func (s *SchemaService) ApplyProjectDDL(
 		return err
 	}
 
-	if err := s.ExecuteDDL(
+	if err := s.StoreRawDDL(
 		ctx,
 		projectID,
-		batch,
+		rawSQL,
 	); err != nil {
 		return err
 	}
@@ -60,15 +56,12 @@ func (s *SchemaService) ApplyProjectDDL(
 	return nil
 }
 
-// ApplyDDL updates the project's logical schema metadata by replaying a batch
-// of parsed DDL statements.
 func (s *SchemaService) ConvertDDL(
 	ctx context.Context,
 	projectID string,
 	batch *ir.Batch,
 ) error {
 
-	// Load current metadata.
 	columns, err := s.columnService.ListColumns(
 		ctx,
 		projectID,
@@ -85,7 +78,6 @@ func (s *SchemaService) ConvertDDL(
 		return err
 	}
 
-	// Build logical schema.
 	schema, err := BuildLogicalSchemaFromMetadata(
 		projectID,
 		columns,
@@ -95,15 +87,12 @@ func (s *SchemaService) ConvertDDL(
 		return err
 	}
 
-	// Replay the parsed DDL.
 	if err := ApplyBatch(schema, batch); err != nil {
 		return err
 	}
 
-	// Flatten back into metadata.
 	updatedColumns, updatedEdges := FlattenLogicalSchema(schema)
 
-	// Persist.
 	if err := s.columnService.ReplaceColumns(
 		ctx,
 		projectID,
@@ -134,19 +123,4 @@ func (s *SchemaService) StoreRawDDL(
 		projectID,
 		rawSQL,
 	)
-}
-
-func (s *SchemaService) ExecuteDDL(
-	ctx context.Context,
-	projectID string,
-	batch *ir.Batch,
-) error {
-
-	// TODO:
-	// planner
-	// executor
-	// replication handling
-	// status updates
-
-	return nil
 }

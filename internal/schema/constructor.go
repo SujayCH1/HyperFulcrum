@@ -35,10 +35,8 @@ func addColumns(
 		table := schema.EnsureTable(column.TableName)
 
 		if err := addColumn(table, ir.Column{
-			Name: column.ColumnName,
-			DataType: ir.DataType{
-				Name: column.DataType,
-			},
+			Name:     column.ColumnName,
+			DataType: ir.NewDataType(column.DataType),
 			Nullable: column.IsNullable,
 		}); err != nil {
 			return err
@@ -71,7 +69,7 @@ func addForeignKeys(
 			Type:    ir.ForeignKey,
 			Columns: []string{edge.ChildColumn},
 			Reference: &ir.Reference{
-				Table: edge.ParentTable,
+				Table: ir.NewTable(edge.ParentTable),
 				Columns: []string{
 					edge.ParentColumn,
 				},

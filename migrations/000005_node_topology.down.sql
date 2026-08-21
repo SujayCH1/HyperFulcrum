@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS node_topology
+DROP TABLE IF EXISTS node_topology;

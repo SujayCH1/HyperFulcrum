@@ -14,12 +14,19 @@ func ApplyBatch(
 	if batch == nil {
 		return ir.ErrNilStatement
 	}
+	if schema == nil {
+		return fmt.Errorf("schema is nil")
+	}
+
+	working := schema.Clone()
 
 	for _, stmt := range batch.Statements {
-		if err := ApplyStatement(schema, stmt); err != nil {
+		if err := ApplyStatement(working, stmt); err != nil {
 			return err
 		}
 	}
+
+	*schema = *working
 
 	return nil
 }
@@ -31,6 +38,9 @@ func ApplyStatement(
 
 	if statement == nil {
 		return ir.ErrNilStatement
+	}
+	if schema == nil {
+		return fmt.Errorf("schema is nil")
 	}
 
 	switch stmt := statement.(type) {
@@ -61,6 +71,12 @@ func applyDDLStatement(
 
 	case ir.DropTable:
 		return applyDropTable(schema, stmt)
+
+	case ir.CreateIndex:
+		return applyCreateIndex(schema, stmt)
+
+	case ir.DropIndex:
+		return applyDropIndex(schema, stmt)
 
 	default:
 		return fmt.Errorf(

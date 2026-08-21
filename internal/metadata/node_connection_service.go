@@ -3,16 +3,19 @@ package metadata
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"hyperfulcrum/internal/cache"
+	"hyperfulcrum/internal/connections"
 	"hyperfulcrum/internal/repository"
 )
 
 type NodeConnectionService struct {
-	repo      *repository.NodeConnectionRepository
-	nodeRepo  *repository.NodeRepository
-	cache     *cache.CacheManager
-	refresher *cache.CacheRefresher
+	repo              *repository.NodeConnectionRepository
+	nodeRepo          *repository.NodeRepository
+	cache             *cache.CacheManager
+	refresher         *cache.CacheRefresher
+	connectionManager *connections.ConnectionManager
 }
 
 func NewNodeConnectionService(
@@ -20,13 +23,15 @@ func NewNodeConnectionService(
 	nodeRepo *repository.NodeRepository,
 	cache *cache.CacheManager,
 	refresher *cache.CacheRefresher,
+	connectionManager *connections.ConnectionManager,
 ) *NodeConnectionService {
 
 	return &NodeConnectionService{
-		repo:      repo,
-		nodeRepo:  nodeRepo,
-		cache:     cache,
-		refresher: refresher,
+		repo:              repo,
+		nodeRepo:          nodeRepo,
+		cache:             cache,
+		refresher:         refresher,
+		connectionManager: connectionManager,
 	}
 }
 
@@ -34,6 +39,13 @@ func (s *NodeConnectionService) AddConnection(
 	ctx context.Context,
 	connection *repository.NodeConnection,
 ) error {
+	node, err := s.nodeRepo.NodeGetByID(
+		ctx,
+		connection.NodeId,
+	)
+	if err != nil {
+		return err
+	}
 
 	if err := s.validateAddConnection(
 		ctx,
@@ -49,17 +61,16 @@ func (s *NodeConnectionService) AddConnection(
 		return err
 	}
 
-	node, err := s.nodeRepo.NodeGetByID(
-		ctx,
-		connection.NodeId,
-	)
-	if err != nil {
-		return err
-	}
-
-	return s.refresher.RefreshConnections(
-		ctx,
-		node.ProjectID,
+	return errors.Join(
+		s.refresher.RefreshConnections(
+			ctx,
+			node.ProjectID,
+		),
+		s.connectionManager.SyncNode(
+			ctx,
+			node.ProjectID,
+			connection.NodeId,
+		),
 	)
 }
 
@@ -90,9 +101,12 @@ func (s *NodeConnectionService) RemoveConnection(
 		return err
 	}
 
-	return s.refresher.RefreshConnections(
-		ctx,
-		node.ProjectID,
+	return errors.Join(
+		s.refresher.RefreshConnections(
+			ctx,
+			node.ProjectID,
+		),
+		s.connectionManager.RemoveNode(node.ProjectID, nodeID),
 	)
 }
 
@@ -124,9 +138,16 @@ func (s *NodeConnectionService) UpdateConnection(
 		return err
 	}
 
-	return s.refresher.RefreshConnections(
-		ctx,
-		node.ProjectID,
+	return errors.Join(
+		s.refresher.RefreshConnections(
+			ctx,
+			node.ProjectID,
+		),
+		s.connectionManager.SyncNode(
+			ctx,
+			node.ProjectID,
+			connection.NodeId,
+		),
 	)
 }
 
@@ -162,6 +183,10 @@ func (s *NodeConnectionService) GetConnectionByNodeID(
 		if !ok {
 			return repository.NodeConnection{}, sql.ErrNoRows
 		}
+	}
+
+	if s.cache.Connections.ProjectLoaded(projectID) {
+		return repository.NodeConnection{}, sql.ErrNoRows
 	}
 
 	if err := s.refresher.RefreshConnections(

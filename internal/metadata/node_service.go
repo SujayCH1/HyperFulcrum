@@ -2,27 +2,32 @@ package metadata
 
 import (
 	"context"
+	"errors"
 
 	"hyperfulcrum/internal/cache"
+	"hyperfulcrum/internal/connections"
 	"hyperfulcrum/internal/repository"
 )
 
 type NodeService struct {
-	repo      *repository.NodeRepository
-	cache     *cache.CacheManager
-	refresher *cache.CacheRefresher
+	repo              *repository.NodeRepository
+	cache             *cache.CacheManager
+	refresher         *cache.CacheRefresher
+	connectionManager *connections.ConnectionManager
 }
 
 func NewNodeService(
 	repo *repository.NodeRepository,
 	cache *cache.CacheManager,
 	refresher *cache.CacheRefresher,
+	connectionManager *connections.ConnectionManager,
 ) *NodeService {
 
 	return &NodeService{
-		repo:      repo,
-		cache:     cache,
-		refresher: refresher,
+		repo:              repo,
+		cache:             cache,
+		refresher:         refresher,
+		connectionManager: connectionManager,
 	}
 }
 
@@ -62,8 +67,8 @@ func (s *NodeService) ListNodes(
 	projectID string,
 ) ([]repository.Node, error) {
 
-	nodes := s.cache.Nodes.GetByProject(projectID)
-	if len(nodes) > 0 {
+	nodes, loaded := s.cache.Nodes.GetByProject(projectID)
+	if loaded {
 		return nodes, nil
 	}
 
@@ -74,7 +79,9 @@ func (s *NodeService) ListNodes(
 		return nil, err
 	}
 
-	return s.cache.Nodes.GetByProject(projectID), nil
+	nodes, _ = s.cache.Nodes.GetByProject(projectID)
+
+	return nodes, nil
 }
 
 func (s *NodeService) RemoveNode(
@@ -104,9 +111,12 @@ func (s *NodeService) RemoveNode(
 		return err
 	}
 
-	return s.refresher.RefreshNodes(
-		ctx,
-		node.ProjectID,
+	return errors.Join(
+		s.connectionManager.RemoveNode(node.ProjectID, nodeID),
+		s.refresher.RefreshNodes(
+			ctx,
+			node.ProjectID,
+		),
 	)
 }
 
@@ -168,9 +178,16 @@ func (s *NodeService) UpdateNodeStatus(
 		return err
 	}
 
-	return s.refresher.RefreshNodes(
-		ctx,
-		node.ProjectID,
+	return errors.Join(
+		s.refresher.RefreshNodes(
+			ctx,
+			node.ProjectID,
+		),
+		s.connectionManager.SyncNode(
+			ctx,
+			node.ProjectID,
+			nodeID,
+		),
 	)
 }
 

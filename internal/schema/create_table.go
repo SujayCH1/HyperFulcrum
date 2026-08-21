@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+
 	"hyperfulcrum/internal/parser/ir"
 )
 
@@ -10,13 +11,16 @@ func applyCreateTable(
 	stmt *ir.DDLStatement,
 ) error {
 
-	tableName := stmt.Table.Name
+	tableName := stmt.Table.Key()
 
 	if _, exists := schema.Tables[tableName]; exists {
+		if stmt.IfNotExists {
+			return nil
+		}
 		return fmt.Errorf("table %q already exists", tableName)
 	}
 
-	table := NewLogicalTable(tableName)
+	table := NewLogicalTable(stmt.Table)
 
 	for _, column := range stmt.Columns {
 		if err := addColumn(table, column); err != nil {
