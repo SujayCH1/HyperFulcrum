@@ -16,6 +16,7 @@ import (
 	"hyperfulcrum/internal/replication"
 	"hyperfulcrum/internal/repository"
 	"hyperfulcrum/internal/schema"
+	"hyperfulcrum/internal/shardkey"
 	"hyperfulcrum/pkg/logger"
 	"net/http"
 	"time"
@@ -34,6 +35,7 @@ type Application struct {
 	TopologyRepo      *repository.NodeTopologyRepository
 	ColumnRepo        *repository.ColumnRepository
 	FKEdgesRepo       *repository.FKEdgesRepository
+	ShardKeyRepo      *repository.ShardKeysRepository
 	SchemaVersionRepo *repository.SchemaVersionRepository
 
 	// metadata services
@@ -47,6 +49,7 @@ type Application struct {
 
 	// replication services
 	ReplicationService *replication.ReplicationService
+	InferenceService *shardkey.InferenceService
 
 	// schema service
 	SchemaService *schema.SchemaService
@@ -114,6 +117,7 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 	a.ProjectRepo = repository.NewProjectRepository(a.database)
 	a.NodeRepo = repository.NewNodeRepository(a.database)
 	a.NodeConnRepo = repository.NewNodeConnectionRepository(a.database)
+	a.ShardKeyRepo = repository.NewShardKeysRepository(a.database)
 	a.TopologyRepo = repository.NewNodeTopologyRepo(a.database)
 	a.ColumnRepo = repository.NewColumnRepository(a.database)
 	a.FKEdgesRepo = repository.NewFKEdgesRepository(a.database)
@@ -241,6 +245,14 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 	)
 
 	logger.Logger.Info("Schema service initialized")
+   
+	logger.Logger.Info("Initializing shardkey inference service")
+	a.InferenceService = shardkey.NewInferenceService(
+		a.ColumnRepo,
+		a.FKEdgesRepo,
+		a.ShardKeyRepo,
+	)
+	logger.Logger.Info("Shardkey inference service initialized")
 
 	// handlers
 	a.ProjectHandler = handlers.NewProjectHandler(
