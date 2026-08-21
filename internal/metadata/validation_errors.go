@@ -18,4 +18,5 @@ var (
 	ErrReplicaAlreadyUsed   = errors.New("replica node is already assigned")
 	ErrShardIsReplica       = errors.New("shard node is already assigned as a replica")
 	ErrDuplicateTopology    = errors.New("topology relation already exists")
+	ErrSchemaNotLocked      = errors.New("project schema is not locked")
 )
