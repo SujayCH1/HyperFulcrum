@@ -58,3 +58,26 @@ func (s *ShardKeysService) validateShardKeyColumn(
 
 	return nil
 }
+
+func (s *ShardKeysService) validateSchemaLocked(
+	ctx context.Context,
+	projectID string,
+) error {
+	schema, ok := s.cache.SchemaVersion.Get(projectID)
+	if !ok {
+		err := s.refresher.RefreshSchemaVersion(ctx, projectID)
+		if err != nil {
+			return err
+		}
+		schema, ok = s.cache.SchemaVersion.Get(projectID)
+	}
+
+	if !ok {
+		return sql.ErrNoRows
+	}
+	if !schema.Locked {
+		return ErrSchemaNotLocked
+	}
+
+	return nil
+}

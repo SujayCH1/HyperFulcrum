@@ -48,6 +48,11 @@ func (s *ShardKeysService) AddShardKey(
 		return repository.ShardKey{}, err
 	}
 
+	err = s.validateSchemaLocked(ctx, projectID)
+	if err != nil {
+		return repository.ShardKey{}, err
+	}
+
 	key, err := s.repo.AddShardKey(ctx, projectID, tableName, keyColumn)
 	if err != nil {
 		return repository.ShardKey{}, err

@@ -9,6 +9,7 @@ import (
 	"github.com/lib/pq"
 
 	"hyperfulcrum/internal/metadata"
+	"hyperfulcrum/internal/repository"
 	"hyperfulcrum/pkg/logger"
 	"hyperfulcrum/pkg/utils"
 )
@@ -47,8 +48,19 @@ func writeHandlerError(
 		errors.Is(err, metadata.ErrConnectionNotFound) ||
 		errors.Is(err, metadata.ErrReplicaAlreadyUsed) ||
 		errors.Is(err, metadata.ErrShardIsReplica) ||
-		errors.Is(err, metadata.ErrDuplicateTopology) {
+		errors.Is(err, metadata.ErrDuplicateTopology) ||
+		errors.Is(err, metadata.ErrSchemaNotLocked) ||
+		errors.Is(err, repository.ErrSchemaNotLocked) ||
+		errors.Is(err, repository.ErrSchemaLocked) ||
+		errors.Is(err, repository.ErrSchemaActivated) ||
+		errors.Is(err, repository.ErrSchemaHasKeys) ||
+		errors.Is(err, repository.ErrSchemaRevision) {
 		utils.WriteJSONErrorResponse(w, http.StatusConflict, message, nil)
+		return
+	}
+
+	if errors.Is(err, repository.ErrSchemaEmpty) {
+		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, message, nil)
 		return
 	}
 

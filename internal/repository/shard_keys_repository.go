@@ -44,13 +44,42 @@ func (r *ShardKeyRepository) AddShardKey(
 		UpdatedAt: time.Now(),
 	}
 
+	tx, err := r.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return ShardKey{}, err
+	}
+	defer tx.Rollback()
+
+	var existingProjectID string
+	err = tx.QueryRowContext(
+		ctx,
+		`SELECT id FROM projects WHERE id = $1 FOR UPDATE`,
+		parsedProjectID,
+	).Scan(&existingProjectID)
+	if err != nil {
+		return ShardKey{}, err
+	}
+
+	var schemaLocked bool
+	err = tx.QueryRowContext(
+		ctx,
+		`SELECT locked FROM schema_versions WHERE project_id = $1 FOR UPDATE`,
+		parsedProjectID,
+	).Scan(&schemaLocked)
+	if err != nil {
+		return ShardKey{}, err
+	}
+	if !schemaLocked {
+		return ShardKey{}, ErrSchemaNotLocked
+	}
+
 	query := `
 		INSERT INTO shard_keys (id, project_id, table_name, key_column, updated_at)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING updated_at
 	`
 
-	err = r.conn.QueryRowContext(
+	err = tx.QueryRowContext(
 		ctx,
 		query,
 		key.ID,
@@ -59,6 +88,11 @@ func (r *ShardKeyRepository) AddShardKey(
 		key.KeyColumn,
 		key.UpdatedAt,
 	).Scan(&key.UpdatedAt)
+	if err != nil {
+		return ShardKey{}, err
+	}
+
+	err = tx.Commit()
 	if err != nil {
 		return ShardKey{}, err
 	}

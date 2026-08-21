@@ -246,8 +246,6 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 	logger.Logger.Info("Initializing schema service")
 
 	a.SchemaService = schema.NewSchemaService(
-		a.ColumnService,
-		a.FKEdgesService,
 		a.SchemaVersionService,
 	)
 
