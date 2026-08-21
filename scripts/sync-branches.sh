@@ -9,9 +9,11 @@ BRANCHES=(
     cache
     conn
     fe
+    metadata
     nodem
     parser
     schema
+    shardkey
 )
 
 echo "Fetching remotes..."
