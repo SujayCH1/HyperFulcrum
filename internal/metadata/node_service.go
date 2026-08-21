@@ -36,7 +36,7 @@ func (s *NodeService) AddNode(
 	projectID string,
 	nodeType string,
 	name string,
-) error {
+) (repository.Node, error) {
 
 	if err := s.validateAddNode(
 		ctx,
@@ -44,22 +44,28 @@ func (s *NodeService) AddNode(
 		nodeType,
 		name,
 	); err != nil {
-		return err
+		return repository.Node{}, err
 	}
 
-	if err := s.repo.NodeAdd(
+	node, err := s.repo.NodeAdd(
 		ctx,
 		projectID,
 		nodeType,
 		name,
-	); err != nil {
-		return err
+	)
+	if err != nil {
+		return repository.Node{}, err
 	}
 
-	return s.refresher.RefreshNodes(
+	err = s.refresher.RefreshNodes(
 		ctx,
 		projectID,
 	)
+	if err != nil {
+		return repository.Node{}, err
+	}
+
+	return node, nil
 }
 
 func (s *NodeService) ListNodes(
@@ -130,6 +136,11 @@ func (s *NodeService) UpdateNodeName(
 		ctx,
 		nodeID,
 	)
+	if err != nil {
+		return err
+	}
+
+	err = s.validateUpdateNodeName(ctx, node, name)
 	if err != nil {
 		return err
 	}

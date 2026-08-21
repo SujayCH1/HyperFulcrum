@@ -37,31 +37,32 @@ func NewNodeConnectionService(
 
 func (s *NodeConnectionService) AddConnection(
 	ctx context.Context,
-	connection *repository.NodeConnection,
-) error {
+	connection repository.NodeConnection,
+) (repository.NodeConnection, error) {
 	node, err := s.nodeRepo.NodeGetByID(
 		ctx,
 		connection.NodeId,
 	)
 	if err != nil {
-		return err
+		return repository.NodeConnection{}, err
 	}
 
 	if err := s.validateAddConnection(
 		ctx,
-		connection,
+		&connection,
 	); err != nil {
-		return err
+		return repository.NodeConnection{}, err
 	}
 
-	if err := s.repo.ConnectionAdd(
+	createdConnection, err := s.repo.ConnectionAdd(
 		ctx,
 		connection,
-	); err != nil {
-		return err
+	)
+	if err != nil {
+		return repository.NodeConnection{}, err
 	}
 
-	return errors.Join(
+	err = errors.Join(
 		s.refresher.RefreshConnections(
 			ctx,
 			node.ProjectID,
@@ -72,6 +73,11 @@ func (s *NodeConnectionService) AddConnection(
 			connection.NodeId,
 		),
 	)
+	if err != nil {
+		return repository.NodeConnection{}, err
+	}
+
+	return createdConnection, nil
 }
 
 func (s *NodeConnectionService) RemoveConnection(

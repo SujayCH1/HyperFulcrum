@@ -8,15 +8,35 @@ func (s *ProjectService) validateDeleteProject(
 	projectID string,
 ) error {
 
-	// Ensure the project exists.
-	if _, err := s.GetProjectByID(ctx, projectID); err != nil {
+	project, err := s.GetProjectByID(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if project.Running {
+		return ErrProjectRunning
+	}
+
+	err = s.refresher.RefreshNodes(ctx, projectID)
+	if err != nil {
 		return err
 	}
 
-	// Future validations:
-	// - Project must not be active.
-	// - Project must not contain any nodes.
-	// - Project must not have replication topology.
+	nodes, _ := s.cache.Nodes.GetByProject(projectID)
+	if len(nodes) != 0 {
+		return ErrProjectHasNodes
+	}
+
+	err = s.refresher.RefreshTopology(ctx, projectID)
+	if err != nil {
+		return err
+	}
+
+	topologies, _ := s.cache.Topology.GetByProjectID(projectID)
+	if len(topologies) != 0 {
+		return ErrProjectHasTopology
+	}
+
+	// Deferred until the corresponding state exists:
 	// - Project must not have pending schema execution.
 	// - Project must not have attached agents.
 
