@@ -3,6 +3,7 @@ package metadata
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"hyperfulcrum/internal/cache"
 	"hyperfulcrum/internal/repository"
@@ -12,6 +13,67 @@ type SchemaVersionService struct {
 	repo      *repository.SchemaVersionRepository
 	cache     *cache.CacheManager
 	refresher *cache.CacheRefresher
+}
+
+func (s *SchemaVersionService) ReplaceProjectSchema(
+	ctx context.Context,
+	projectID string,
+	rawSQL string,
+	columns []repository.Column,
+	edges []repository.FkEdges,
+	expectedRevision int64,
+) (repository.SchemaVersion, error) {
+	schema, err := s.repo.ReplaceProjectSchema(
+		ctx,
+		projectID,
+		rawSQL,
+		columns,
+		edges,
+		expectedRevision,
+	)
+	if err != nil {
+		if errors.Is(err, repository.ErrSchemaRevision) {
+			refreshErr := s.refresher.RefreshSchemaVersion(ctx, projectID)
+			if refreshErr != nil {
+				return repository.SchemaVersion{}, errors.Join(err, refreshErr)
+			}
+		}
+		return repository.SchemaVersion{}, err
+	}
+
+	s.cache.Columns.ReplaceProject(projectID, columns)
+	s.cache.FKEdges.ReplaceProject(projectID, edges)
+	s.cache.SchemaVersion.Set(schema)
+
+	return schema, nil
+}
+
+func (s *SchemaVersionService) LockSchema(
+	ctx context.Context,
+	projectID string,
+) (repository.SchemaVersion, error) {
+	schema, err := s.repo.LockSchema(ctx, projectID)
+	if err != nil {
+		return repository.SchemaVersion{}, err
+	}
+
+	s.cache.SchemaVersion.Set(schema)
+
+	return schema, nil
+}
+
+func (s *SchemaVersionService) UnlockSchema(
+	ctx context.Context,
+	projectID string,
+) (repository.SchemaVersion, error) {
+	schema, err := s.repo.UnlockSchema(ctx, projectID)
+	if err != nil {
+		return repository.SchemaVersion{}, err
+	}
+
+	s.cache.SchemaVersion.Set(schema)
+
+	return schema, nil
 }
 
 func NewSchemaVersionService(
@@ -25,27 +87,6 @@ func NewSchemaVersionService(
 		cache:     cache,
 		refresher: refresher,
 	}
-}
-
-func (s *SchemaVersionService) ReplaceSchemaVersion(
-	ctx context.Context,
-	projectID string,
-	rawSQL string,
-) error {
-
-	err := s.repo.ReplaceSchema(
-		ctx,
-		projectID,
-		rawSQL,
-	)
-	if err != nil {
-		return err
-	}
-
-	return s.refresher.RefreshSchemaVersion(
-		ctx,
-		projectID,
-	)
 }
 
 func (s *SchemaVersionService) GetSchemaVersion(
@@ -75,23 +116,4 @@ func (s *SchemaVersionService) GetSchemaVersion(
 	}
 
 	return schema, nil
-}
-
-func (s *SchemaVersionService) DeleteSchemaVersion(
-	ctx context.Context,
-	projectID string,
-) error {
-
-	err := s.repo.DeleteSchema(
-		ctx,
-		projectID,
-	)
-	if err != nil {
-		return err
-	}
-
-	return s.refresher.RefreshSchemaVersion(
-		ctx,
-		projectID,
-	)
 }
