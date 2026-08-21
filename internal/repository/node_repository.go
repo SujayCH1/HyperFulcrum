@@ -85,10 +85,15 @@ func (r *NodeRepository) NodeList(
 	return nodes, nil
 }
 
-func (r *NodeRepository) NodeAdd(ctx context.Context, projectID string, nodeType string, nodeName string) error {
+func (r *NodeRepository) NodeAdd(
+	ctx context.Context,
+	projectID string,
+	nodeType string,
+	nodeName string,
+) (Node, error) {
 	tx, err := r.conn.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return Node{}, err
 	}
 	defer tx.Rollback()
 
@@ -102,7 +107,7 @@ func (r *NodeRepository) NodeAdd(ctx context.Context, projectID string, nodeType
 	var project string
 	err = tx.QueryRowContext(ctx, queryProject, projectID).Scan(&project)
 	if err != nil {
-		return err
+		return Node{}, err
 	}
 
 	var index int
@@ -115,31 +120,45 @@ func (r *NodeRepository) NodeAdd(ctx context.Context, projectID string, nodeType
 
 	err = tx.QueryRowContext(ctx, queryIndex, projectID).Scan(&index)
 	if err != nil {
-		return err
+		return Node{}, err
+	}
+
+	node := Node{
+		ID:        uuid.NewString(),
+		ProjectID: projectID,
+		Name:      nodeName,
+		Index:     index,
+		Status:    false,
+		Type:      nodeType,
 	}
 
 	query := `
 		INSERT INTO nodes 
 		(id, project_id, node_name, node_index, node_status, node_type)
 		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING created_at
 	`
 
-	_, err = tx.ExecContext(
+	err = tx.QueryRowContext(
 		ctx,
 		query,
-		uuid.New(),
-		projectID,
-		nodeName,
-		index,
-		false,
-		nodeType,
-	)
+		node.ID,
+		node.ProjectID,
+		node.Name,
+		node.Index,
+		node.Status,
+		node.Type,
+	).Scan(&node.CreatedAt)
 	if err != nil {
-		return err
+		return Node{}, err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return Node{}, err
+	}
 
+	return node, nil
 }
 
 func (r *NodeRepository) NodeRemove(

@@ -91,12 +91,7 @@ func (h *TopologyHandler) DeleteTopology(
 		return
 	}
 
-	utils.WriteJSONSuccessResponse(
-		w,
-		http.StatusOK,
-		"Topology deleted successfully",
-		nil,
-	)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *TopologyHandler) ListTopologies(

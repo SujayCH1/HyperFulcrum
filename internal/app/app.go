@@ -35,6 +35,7 @@ type Application struct {
 	ColumnRepo        *repository.ColumnRepository
 	FKEdgesRepo       *repository.FKEdgesRepository
 	SchemaVersionRepo *repository.SchemaVersionRepository
+	ShardKeyRepo      *repository.ShardKeyRepository
 
 	// metadata services
 	ProjectService        *metadata.ProjectService
@@ -44,6 +45,7 @@ type Application struct {
 	ColumnService         *metadata.ColumnService
 	FKEdgesService        *metadata.FKEdgesService
 	SchemaVersionService  *metadata.SchemaVersionService
+	ShardKeysService      *metadata.ShardKeysService
 
 	// replication services
 	ReplicationService *replication.ReplicationService
@@ -118,6 +120,7 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 	a.ColumnRepo = repository.NewColumnRepository(a.database)
 	a.FKEdgesRepo = repository.NewFKEdgesRepository(a.database)
 	a.SchemaVersionRepo = repository.NewSchemaVersionRepository(a.database)
+	a.ShardKeyRepo = repository.NewShardKeyRepository(a.database)
 
 	logger.Logger.Info("Repositories initialized")
 
@@ -134,6 +137,7 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 		a.ColumnRepo,
 		a.FKEdgesRepo,
 		a.SchemaVersionRepo,
+		a.ShardKeyRepo,
 		a.CacheManager,
 	)
 
@@ -214,6 +218,12 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 
 	a.SchemaVersionService = metadata.NewSchemaVersionService(
 		a.SchemaVersionRepo,
+		a.CacheManager,
+		a.CacheRefresher,
+	)
+
+	a.ShardKeysService = metadata.NewShardKeysService(
+		a.ShardKeyRepo,
 		a.CacheManager,
 		a.CacheRefresher,
 	)

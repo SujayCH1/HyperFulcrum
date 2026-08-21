@@ -9,6 +9,7 @@ type CacheManager struct {
 	Columns       *ColumnStore
 	FKEdges       *FKEdgesStore
 	SchemaVersion *SchemaVersionStore
+	ShardKeys     *ShardKeysStore
 }
 
 func NewCacheManager() *CacheManager {
@@ -21,6 +22,7 @@ func NewCacheManager() *CacheManager {
 		Columns:       NewColumnStore(),
 		FKEdges:       NewFKEdgesStore(),
 		SchemaVersion: NewSchemaVersionStore(),
+		ShardKeys:     NewShardKeysStore(),
 	}
 }
 
@@ -32,6 +34,7 @@ func (m *CacheManager) DeleteProject(projectID string) {
 	m.Columns.DeleteProject(projectID)
 	m.FKEdges.DeleteProject(projectID)
 	m.SchemaVersion.DeleteProject(projectID)
+	m.ShardKeys.DeleteProject(projectID)
 }
 
 func (m *CacheManager) Clear() {
@@ -42,4 +45,5 @@ func (m *CacheManager) Clear() {
 	m.Columns.Clear()
 	m.FKEdges.Clear()
 	m.SchemaVersion.Clear()
+	m.ShardKeys.Clear()
 }
