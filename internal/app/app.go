@@ -58,6 +58,7 @@ type Application struct {
 	NodeHandler           *handlers.NodeHandler
 	NodeConnectionHandler *handlers.NodeConnectionHandler
 	NodeTopologyHandler   *handlers.TopologyHandler
+	ShardKeyHandler       *handlers.ShardKeyHandler
 
 	// replication handlers
 	ReplicationHandler *handlers.ReplicationHandler
@@ -269,6 +270,10 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 		a.NodeTopologyService,
 	)
 
+	a.ShardKeyHandler = handlers.NewShardKeyHandler(
+		a.ShardKeysService,
+	)
+
 	a.ReplicationHandler = handlers.NewReplicationHandler(
 		a.ReplicationService,
 	)
@@ -279,6 +284,7 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 		a.NodeHandler,
 		a.NodeConnectionHandler,
 		a.NodeTopologyHandler,
+		a.ShardKeyHandler,
 		a.ReplicationHandler,
 	)
 
