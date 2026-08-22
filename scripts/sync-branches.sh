@@ -14,6 +14,7 @@ BRANCHES=(
     parser
     schema
     shardkey
+    repl
 )
 
 echo "Fetching remotes..."
