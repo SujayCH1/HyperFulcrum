@@ -8,6 +8,12 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	NodeRolePrimary    = "primary"
+	NodeRoleStandby    = "standby"
+	NodeRoleUnassigned = "unassigned"
+)
+
 type Node struct {
 	ID        string `json:"id"`
 	ProjectID string `json:"project_id"`
@@ -88,9 +94,13 @@ func (r *NodeRepository) NodeList(
 func (r *NodeRepository) NodeAdd(
 	ctx context.Context,
 	projectID string,
-	nodeType string,
+	nodeRole string,
 	nodeName string,
 ) (Node, error) {
+	if err := validateNodeRole(nodeRole); err != nil {
+		return Node{}, err
+	}
+
 	tx, err := r.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return Node{}, err
@@ -129,7 +139,7 @@ func (r *NodeRepository) NodeAdd(
 		Name:      nodeName,
 		Index:     index,
 		Status:    false,
-		Type:      nodeType,
+		Type:      nodeRole,
 	}
 
 	query := `
@@ -278,11 +288,21 @@ func (r *NodeRepository) NodeUpdateStatus(
 func (r *NodeRepository) NodeUpdateType(
 	ctx context.Context,
 	nodeID string,
-	nodeType string,
+	nodeRole string,
 ) error {
+	return r.NodeUpdateRole(ctx, nodeID, nodeRole)
+}
 
-	if nodeType != "shard" && nodeType != "replica" {
-		return fmt.Errorf("invalid node type: %s", nodeType)
+// NodeUpdateRole updates the desired PostgreSQL role of a physical node.
+// NodeUpdateType remains as a compatibility wrapper while callers migrate to
+// the new terminology.
+func (r *NodeRepository) NodeUpdateRole(
+	ctx context.Context,
+	nodeID string,
+	nodeRole string,
+) error {
+	if err := validateNodeRole(nodeRole); err != nil {
+		return err
 	}
 
 	query := `
@@ -294,7 +314,7 @@ func (r *NodeRepository) NodeUpdateType(
 	res, err := r.conn.ExecContext(
 		ctx,
 		query,
-		nodeType,
+		nodeRole,
 		nodeID,
 	)
 	if err != nil {
@@ -311,6 +331,15 @@ func (r *NodeRepository) NodeUpdateType(
 	}
 
 	return nil
+}
+
+func validateNodeRole(nodeRole string) error {
+	switch nodeRole {
+	case NodeRolePrimary, NodeRoleStandby, NodeRoleUnassigned:
+		return nil
+	default:
+		return fmt.Errorf("invalid node role: %s", nodeRole)
+	}
 }
 
 // func (r *NodeRepository) NodesGetByPorjectID(ctx context.Context, projectID string) ([]Node, error) {
