@@ -12,6 +12,7 @@ BRANCHES=(
     metadata
     nodem
     parser
+    replication-metadata
     schema
     shardkey
 )
