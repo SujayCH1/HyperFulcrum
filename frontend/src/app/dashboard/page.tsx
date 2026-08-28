@@ -342,8 +342,7 @@ function NodeRow({ node, onExecute }: { node: Node; onExecute: (id: string) => v
         <TuxIcon size={16} />
         <div className="flex-1 min-w-0">
           <div className="text-zinc-200 font-mono text-sm font-semibold">{node.node_name}</div>
-          {/* node_type shown as a badge instead of node_host */}
-          <div className="text-zinc-600 text-[10px] font-mono">{node.node_type ?? "primary"}</div>
+          <div className="text-zinc-600 text-[10px] font-mono">{node.role ?? "unassigned"}</div>
         </div>
         <div className="hidden sm:flex items-center gap-4 text-[10px] font-mono text-zinc-600">
           {node.node_status && (
@@ -382,7 +381,7 @@ function NodeRow({ node, onExecute }: { node: Node; onExecute: (id: string) => v
         <div className="px-5 pb-4 pt-0 border-t border-zinc-900 text-[11px] font-mono text-zinc-600 space-y-1">
           <div>ID: {node.id}</div>
           <div>Index: {node.node_index}</div>
-          <div>Type: {node.node_type ?? "primary"}</div>
+          <div>Role: {node.role ?? "unassigned"}</div>
           <div>Created: {new Date(node.created_at).toLocaleString()}</div>
         </div>
       )}

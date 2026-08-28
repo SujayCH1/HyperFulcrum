@@ -4,7 +4,7 @@
 
 import { create } from "zustand";
 import { projectsApi, nodesApi } from "@/lib/api";
-import type { Project, Node, Log, AddNodePayload } from "@/types";
+import type { Project, Node, NodeRole, Log, AddNodePayload } from "@/types";
 
 interface ProjectState {
   projects: Project[];
@@ -30,7 +30,7 @@ interface ProjectState {
   deleteNode: (nodeId: string) => Promise<boolean>;
   updateNodeStatus: (nodeId: string, status: boolean) => Promise<boolean>;
   updateNodeName: (nodeId: string, name: string) => Promise<boolean>;
-  updateNodeType: (nodeId: string, type: string) => Promise<boolean>;
+  updateNodeRole: (nodeId: string, role: NodeRole) => Promise<boolean>;
 
   addLog: (message: string, level?: "info" | "error" | "warn" | "cmd") => void;
   clearLogs: () => void;
@@ -115,7 +115,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       await nodesApi.create(projectId, {
         name: payload.node_name,
-        type: "shard",
+        role: "primary",
         // index: 0,
         // status: false,
       });
@@ -174,15 +174,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  updateNodeType: async (nodeId, type) => {
+  updateNodeRole: async (nodeId, role) => {
     try {
-      await nodesApi.updateType(nodeId, type);
+      await nodesApi.updateRole(nodeId, role);
       set((s) => ({
         nodes: s.nodes.map((n) =>
-          n.id === nodeId ? { ...n, node_type: type as Node["node_type"] } : n
+          n.id === nodeId ? { ...n, role } : n
         ),
       }));
-      get().addLog(`Node ${nodeId} type → ${type}`, "info");
+      get().addLog(`Node ${nodeId} role → ${role}`, "info");
       return true;
     } catch (e) {
       set({ error: (e as Error).message });

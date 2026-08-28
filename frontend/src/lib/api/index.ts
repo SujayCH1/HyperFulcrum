@@ -4,4 +4,6 @@
 
 export { projectsApi } from "./projectsApi";
 export { nodesApi } from "./nodesApi";
+export { shardsApi } from "./shardsApi";
 export type { CreateNodePayload } from "./nodesApi";
+export type { CreateShardPayload } from "./shardsApi";

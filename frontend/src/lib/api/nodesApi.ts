@@ -6,16 +6,16 @@
 //   DELETE /nodes/{id}                          → delete node
 //   PUT    /nodes/{id}/name?name=<value>        → rename node
 //   PATCH  /nodes/{id}/status?status=<bool>     → update node status
-//   PATCH  /nodes/{id}/type?type=<value>        → update node type
+//   PATCH  /nodes/{id}/role?role=<value>        → update desired node role
 //
-// Go NodeDto fields: { name, type, index, status }
+// Go NodeDto fields: { name, role, index, status }
 
 import apiClient from "@/lib/apiClient";
-import type { Node, NodeType } from "@/types";
+import type { Node, NodeRole, NodeRuntimeState } from "@/types";
 
 export interface CreateNodePayload {
   name: string;       // Go field: "name"
-  type: NodeType;     // Go field: "type" — "shard" | "replica"
+  role: NodeRole;
   // index: number;      // Go field: "index"
   // status: boolean;    // Go field: "status"
 }
@@ -57,7 +57,7 @@ export const nodesApi = {
       try {
         const node = await nodesApi.create(projectId, {
           name: nodeName,
-          type: "shard",
+          role: "primary",
           // index: i,
           // status: false,
         });
@@ -89,10 +89,15 @@ export const nodesApi = {
     });
   },
 
-  /** PATCH /nodes/{id}/type?type=<value> */
-  updateType: async (nodeId: string, type: NodeType | string): Promise<void> => {
-    await apiClient.patch(`/nodes/${nodeId}/type`, null, {
-      params: { type },
+  /** PATCH /nodes/{id}/role?role=<value> */
+  updateRole: async (nodeId: string, role: NodeRole): Promise<void> => {
+    await apiClient.patch(`/nodes/${nodeId}/role`, null, {
+      params: { role },
     });
+  },
+
+  runtimeState: async (nodeId: string): Promise<NodeRuntimeState> => {
+    const { data } = await apiClient.get<NodeRuntimeState>(`/nodes/${nodeId}/runtime-state`);
+    return data;
   },
 };

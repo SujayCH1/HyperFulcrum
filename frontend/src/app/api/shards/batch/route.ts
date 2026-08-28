@@ -1,6 +1,6 @@
 // // app/api/shards/batch/route.ts
 // // Calls Go POST /projects/:id/nodes N times
-// // Go NodeDto expects: { name, type, index, status } — NOT node_name/node_type
+// // Go NodeDto expects: { name, role, index, status }
 
 // const GO_API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -24,7 +24,7 @@
 //           headers: { "Content-Type": "application/json" },
 //           body: JSON.stringify({
 //             name: nodeName,   // Go NodeDto field: "name"
-//             type: "shard",    // Go NodeDto field: "type" — must be "shard" or "replica"
+//             role: "primary",
 //             index: i,         // Go NodeDto field: "index"
 //             status: false,    // Go NodeDto field: "status"
 //           }),
