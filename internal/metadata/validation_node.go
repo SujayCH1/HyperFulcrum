@@ -10,7 +10,7 @@ import (
 func (s *NodeService) validateAddNode(
 	ctx context.Context,
 	projectID string,
-	nodeType string,
+	nodeRole string,
 	name string,
 ) error {
 	project, ok := s.cache.Projects.Get(projectID)
@@ -27,8 +27,8 @@ func (s *NodeService) validateAddNode(
 	if project.Running {
 		return ErrProjectRunning
 	}
-	if nodeType != "shard" && nodeType != "replica" {
-		return ErrInvalidNodeType
+	if nodeRole != repository.NodeRolePrimary && nodeRole != repository.NodeRoleStandby && nodeRole != repository.NodeRoleUnassigned {
+		return ErrInvalidNodeRole
 	}
 
 	nodes, loaded := s.cache.Nodes.GetByProject(projectID)
@@ -84,8 +84,21 @@ func (s *NodeService) validateRemoveNode(
 	}
 
 	for _, topology := range topologies {
-		if topology.ShardNodeID == node.ID || topology.ReplicaNodeID == node.ID {
+		if topology.PrimaryNodeID == node.ID || topology.StandbyNodeID == node.ID {
 			return ErrNodeInTopology
+		}
+	}
+
+	shards, loaded := s.cache.Shards.GetByProject(node.ProjectID)
+	if !loaded {
+		if err := s.refresher.RefreshShards(ctx, node.ProjectID); err != nil {
+			return err
+		}
+		shards, _ = s.cache.Shards.GetByProject(node.ProjectID)
+	}
+	for _, shard := range shards {
+		if shard.PrimaryNodeID == node.ID {
+			return ErrNodeOwnsShard
 		}
 	}
 
@@ -123,7 +136,7 @@ func (s *NodeService) validateUpdateNodeStatus(
 			topologies, _ = s.cache.Topology.GetByProjectID(node.ProjectID)
 		}
 		for _, topology := range topologies {
-			if topology.ShardNodeID == node.ID || topology.ReplicaNodeID == node.ID {
+			if topology.PrimaryNodeID == node.ID || topology.StandbyNodeID == node.ID {
 				return ErrNodeInTopology
 			}
 		}
@@ -172,13 +185,13 @@ func (s *NodeService) validateUpdateNodeName(
 	return nil
 }
 
-func (s *NodeService) validateUpdateNodeType(
+func (s *NodeService) validateUpdateNodeRole(
 	ctx context.Context,
 	node repository.Node,
-	nodeType string,
+	nodeRole string,
 ) error {
-	if nodeType != "shard" && nodeType != "replica" {
-		return ErrInvalidNodeType
+	if nodeRole != repository.NodeRolePrimary && nodeRole != repository.NodeRoleStandby && nodeRole != repository.NodeRoleUnassigned {
+		return ErrInvalidNodeRole
 	}
 
 	project, ok := s.cache.Projects.Get(node.ProjectID)
@@ -205,8 +218,21 @@ func (s *NodeService) validateUpdateNodeType(
 		topologies, _ = s.cache.Topology.GetByProjectID(node.ProjectID)
 	}
 	for _, topology := range topologies {
-		if topology.ShardNodeID == node.ID || topology.ReplicaNodeID == node.ID {
+		if topology.PrimaryNodeID == node.ID || topology.StandbyNodeID == node.ID {
 			return ErrNodeInTopology
+		}
+	}
+
+	shards, loaded := s.cache.Shards.GetByProject(node.ProjectID)
+	if !loaded {
+		if err := s.refresher.RefreshShards(ctx, node.ProjectID); err != nil {
+			return err
+		}
+		shards, _ = s.cache.Shards.GetByProject(node.ProjectID)
+	}
+	for _, shard := range shards {
+		if shard.PrimaryNodeID == node.ID {
+			return ErrNodeOwnsShard
 		}
 	}
 

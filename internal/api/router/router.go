@@ -12,6 +12,8 @@ func NewRouter(
 	NodeHandler *handlers.NodeHandler,
 	NodeConnectionHandler *handlers.NodeConnectionHandler,
 	NodeTopologyHandler *handlers.TopologyHandler,
+	ShardHandler *handlers.ShardHandler,
+	RuntimeStateHandler *handlers.NodeRuntimeStateHandler,
 	ShardKeyHandler *handlers.ShardKeyHandler,
 	ReplicationHandler *handlers.ReplicationHandler,
 ) *http.ServeMux {
@@ -25,6 +27,7 @@ func NewRouter(
 	nodeIDValidator := middleware.UUIDPathValidator("id")
 	nodeConnectionIDValidator := middleware.UUIDPathValidator("nodeId")
 	topologyIDValidator := middleware.UUIDPathValidator("projectId", "relationId")
+	shardIDValidator := middleware.UUIDPathValidator("id")
 	shardKeyIDValidator := middleware.UUIDPathValidator("projectId", "id")
 
 	// nodeTopologyCreateValidator := middleware.TopologyCreateValidator
@@ -43,7 +46,9 @@ func NewRouter(
 	mux.Handle("DELETE /nodes/{id}", nodeIDValidator(http.HandlerFunc(NodeHandler.RemoveNode)))
 	mux.Handle("PUT /nodes/{id}/name", nodeIDValidator(http.HandlerFunc(NodeHandler.UpdateNodeName)))
 	mux.Handle("PATCH /nodes/{id}/status", nodeIDValidator(http.HandlerFunc(NodeHandler.UpdateNodeStatus)))
-	mux.Handle("PATCH /nodes/{id}/type", nodeIDValidator(http.HandlerFunc(NodeHandler.UpdateNodeType)))
+	mux.Handle("PATCH /nodes/{id}/role", nodeIDValidator(http.HandlerFunc(NodeHandler.UpdateNodeRole)))
+	mux.Handle("GET /nodes/{id}/runtime-state", nodeIDValidator(http.HandlerFunc(RuntimeStateHandler.GetByNodeID)))
+	mux.Handle("GET /projects/{projectId}/runtime-states", projectIDValidator(http.HandlerFunc(RuntimeStateHandler.ListByProject)))
 
 	// Node connection routes
 	mux.Handle("POST /nodes/{nodeId}/connection", nodeConnectionIDValidator(nodeConnectionValidator(http.HandlerFunc(NodeConnectionHandler.AddNodeConnection))))
@@ -57,15 +62,22 @@ func NewRouter(
 	mux.Handle("GET /projects/{projectId}/shard-keys/{tableName}", projectIDValidator(http.HandlerFunc(ShardKeyHandler.GetShardKey)))
 	mux.Handle("DELETE /projects/{projectId}/shard-keys/{id}", shardKeyIDValidator(http.HandlerFunc(ShardKeyHandler.DeleteShardKey)))
 
+	// Logical shard routes
+	mux.Handle("POST /projects/{projectId}/shards", projectIDValidator(middleware.ShardValidator(http.HandlerFunc(ShardHandler.AddShard))))
+	mux.Handle("GET /projects/{projectId}/shards", projectIDValidator(http.HandlerFunc(ShardHandler.ListShards)))
+	mux.Handle("GET /shards/{id}", shardIDValidator(http.HandlerFunc(ShardHandler.GetShard)))
+	mux.Handle("PATCH /shards/{id}/name", shardIDValidator(http.HandlerFunc(ShardHandler.RenameShard)))
+	mux.Handle("DELETE /shards/{id}", shardIDValidator(http.HandlerFunc(ShardHandler.RemoveShard)))
+
 	// Replication & Topology Routes routes
 	// Replication routes return 501 until replication is implemented.
 	mux.HandleFunc("POST /replication", ReplicationHandler.CreateReplication)
 	mux.HandleFunc("DELETE /replication", ReplicationHandler.DeleteReplication)
 	mux.HandleFunc("POST /replication/promote", ReplicationHandler.PromoteReplica)
-	// mux.Handle("POST /topology/", nodeTopologyCreateValidator(http.HandlerFunc(NodeTopologyHandler.CreateTopology)))
-	// mux.Handle("DELETE /topology/", nodeTopologyDeleteValidator(http.HandlerFunc(NodeTopologyHandler.DeleteTopology)))
+	mux.Handle("POST /projects/{projectId}/topology", projectIDValidator(middleware.TopologyCreateValidator(http.HandlerFunc(NodeTopologyHandler.CreateTopology))))
 	mux.Handle("GET /projects/{projectId}/topology", projectIDValidator(http.HandlerFunc(NodeTopologyHandler.ListTopologies)))
 	mux.Handle("GET /projects/{projectId}/topology/{relationId}", topologyIDValidator(http.HandlerFunc(NodeTopologyHandler.GetTopologyByID)))
+	mux.Handle("DELETE /projects/{projectId}/topology/{relationId}", topologyIDValidator(http.HandlerFunc(NodeTopologyHandler.DeleteTopologyByPath)))
 
 	return mux
 }

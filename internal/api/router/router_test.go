@@ -14,7 +14,9 @@ func newTestRouter() http.Handler {
 		handlers.NewProjectHandler(nil),
 		handlers.NewNodeHandler(nil),
 		handlers.NewNodeConnectionHandler(nil),
-		handlers.NewTopoogyHandler(nil),
+		handlers.NewTopologyHandler(nil),
+		handlers.NewShardHandler(nil),
+		handlers.NewNodeRuntimeStateHandler(nil),
 		handlers.NewShardKeyHandler(nil),
 		handlers.NewReplicationHandler(nil),
 	)

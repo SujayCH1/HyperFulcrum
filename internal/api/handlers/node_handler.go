@@ -31,7 +31,7 @@ func (h *NodeHandler) AddNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node, err := h.service.AddNode(r.Context(), projectID, payload.Type, payload.Name)
+	node, err := h.service.AddNode(r.Context(), projectID, payload.Role, payload.Name)
 	if err != nil {
 		writeHandlerError(w, "Project not found", "Failed to add node", err)
 		return
@@ -107,17 +107,21 @@ func (h *NodeHandler) UpdateNodeStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *NodeHandler) UpdateNodeType(w http.ResponseWriter, r *http.Request) {
-	nodeID := r.PathValue("id")
-	nodeType := r.URL.Query().Get("type")
+	h.UpdateNodeRole(w, r)
+}
 
-	if err := dto.ValidateNodeType(nodeType); err != nil {
-		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Invalid node type", err)
+func (h *NodeHandler) UpdateNodeRole(w http.ResponseWriter, r *http.Request) {
+	nodeID := r.PathValue("id")
+	nodeRole := r.URL.Query().Get("role")
+
+	if err := dto.ValidateNodeRole(nodeRole); err != nil {
+		utils.WriteJSONErrorResponse(w, http.StatusBadRequest, "Invalid node role", err)
 		return
 	}
 
-	err := h.service.UpdateNodeType(r.Context(), nodeID, nodeType)
+	err := h.service.UpdateNodeRole(r.Context(), nodeID, nodeRole)
 	if err != nil {
-		writeHandlerError(w, "Node not found", "Failed to update node type", err)
+		writeHandlerError(w, "Node not found", "Failed to update node role", err)
 		return
 	}
 

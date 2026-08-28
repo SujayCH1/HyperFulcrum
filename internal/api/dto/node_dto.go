@@ -6,7 +6,7 @@ type NodeDto struct {
 	Name   string `json:"name"`
 	Index  int    `json:"index"`
 	Status bool   `json:"status"`
-	Type   string `json:"type"`
+	Role   string `json:"role"`
 }
 
 func (dto *NodeDto) Validate() error {
@@ -14,7 +14,7 @@ func (dto *NodeDto) Validate() error {
 		validation.Field(&dto.Name, validation.Required, validation.Length(3, 100)),
 		validation.Field(&dto.Index, validation.Skip),
 		validation.Field(&dto.Status, validation.Skip),
-		validation.Field(&dto.Type, validation.Required, validation.In("shard", "replica")),
+		validation.Field(&dto.Role, validation.Required, validation.In("primary", "standby", "unassigned")),
 	)
 }
 
@@ -22,6 +22,6 @@ func ValidateNodeName(name string) error {
 	return validation.Validate(name, validation.Required, validation.Length(3, 100))
 }
 
-func ValidateNodeType(nodeType string) error {
-	return validation.Validate(nodeType, validation.Required, validation.In("shard", "replica"))
+func ValidateNodeRole(nodeRole string) error {
+	return validation.Validate(nodeRole, validation.Required, validation.In("primary", "standby", "unassigned"))
 }

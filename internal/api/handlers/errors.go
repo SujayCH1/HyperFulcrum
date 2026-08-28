@@ -30,7 +30,8 @@ func writeHandlerError(
 		return
 	}
 
-	if errors.Is(err, metadata.ErrInvalidNodeType) ||
+	if errors.Is(err, metadata.ErrInvalidNodeRole) ||
+		errors.Is(err, metadata.ErrInvalidShardStatus) ||
 		errors.Is(err, metadata.ErrInvalidConnection) ||
 		errors.Is(err, metadata.ErrTopologySelfRelation) ||
 		errors.Is(err, metadata.ErrTopologyRoleMismatch) {
@@ -41,9 +42,15 @@ func writeHandlerError(
 	if errors.Is(err, metadata.ErrProjectRunning) ||
 		errors.Is(err, metadata.ErrProjectHasNodes) ||
 		errors.Is(err, metadata.ErrProjectHasTopology) ||
+		errors.Is(err, metadata.ErrProjectHasShards) ||
 		errors.Is(err, metadata.ErrDuplicateNodeName) ||
 		errors.Is(err, metadata.ErrNodeActive) ||
 		errors.Is(err, metadata.ErrNodeInTopology) ||
+		errors.Is(err, metadata.ErrNodeOwnsShard) ||
+		errors.Is(err, metadata.ErrPrimaryNodeAlreadyUsed) ||
+		errors.Is(err, metadata.ErrDuplicateShardName) ||
+		errors.Is(err, metadata.ErrPrimaryRoleRequired) ||
+		errors.Is(err, metadata.ErrShardHasStandbys) ||
 		errors.Is(err, metadata.ErrConnectionExists) ||
 		errors.Is(err, metadata.ErrConnectionNotFound) ||
 		errors.Is(err, metadata.ErrReplicaAlreadyUsed) ||

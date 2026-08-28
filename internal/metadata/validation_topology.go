@@ -10,8 +10,8 @@ import (
 func (s *TopologyService) validateCreateTopology(
 	ctx context.Context,
 	projectID string,
-	replicaID string,
 	shardID string,
+	standbyID string,
 ) error {
 	project, ok := s.cache.Projects.Get(projectID)
 	if !ok {
@@ -27,7 +27,26 @@ func (s *TopologyService) validateCreateTopology(
 	if project.Running {
 		return ErrProjectRunning
 	}
-	if shardID == replicaID {
+	shards, loaded := s.cache.Shards.GetByProject(projectID)
+	if !loaded {
+		if err := s.refresher.RefreshShards(ctx, projectID); err != nil {
+			return err
+		}
+		shards, _ = s.cache.Shards.GetByProject(projectID)
+	}
+	var shard repository.Shard
+	shardFound := false
+	for _, value := range shards {
+		if value.ID == shardID {
+			shard = value
+			shardFound = true
+			break
+		}
+	}
+	if !shardFound {
+		return sql.ErrNoRows
+	}
+	if shard.PrimaryNodeID == standbyID {
 		return ErrTopologySelfRelation
 	}
 
@@ -40,27 +59,27 @@ func (s *TopologyService) validateCreateTopology(
 		nodes, _ = s.cache.Nodes.GetByProject(projectID)
 	}
 
-	var shard repository.Node
-	var replica repository.Node
-	shardFound := false
-	replicaFound := false
+	var primary repository.Node
+	var standby repository.Node
+	primaryFound := false
+	standbyFound := false
 	for _, node := range nodes {
-		if node.ID == shardID {
-			shard = node
-			shardFound = true
+		if node.ID == shard.PrimaryNodeID {
+			primary = node
+			primaryFound = true
 		}
-		if node.ID == replicaID {
-			replica = node
-			replicaFound = true
+		if node.ID == standbyID {
+			standby = node
+			standbyFound = true
 		}
 	}
-	if !shardFound || !replicaFound {
+	if !primaryFound || !standbyFound {
 		return sql.ErrNoRows
 	}
-	if shard.ProjectID != projectID || replica.ProjectID != projectID {
+	if primary.ProjectID != projectID || standby.ProjectID != projectID {
 		return sql.ErrNoRows
 	}
-	if shard.Type != "shard" || replica.Type != "replica" {
+	if primary.Role != repository.NodeRolePrimary || standby.Role != repository.NodeRoleStandby {
 		return ErrTopologyRoleMismatch
 	}
 
@@ -74,13 +93,13 @@ func (s *TopologyService) validateCreateTopology(
 	}
 
 	for _, topology := range topologies {
-		if topology.ShardNodeID == shardID && topology.ReplicaNodeID == replicaID {
+		if topology.ShardID == shardID && topology.StandbyNodeID == standbyID {
 			return ErrDuplicateTopology
 		}
-		if topology.ReplicaNodeID == replicaID {
+		if topology.StandbyNodeID == standbyID {
 			return ErrReplicaAlreadyUsed
 		}
-		if topology.ReplicaNodeID == shardID {
+		if topology.StandbyNodeID == shard.PrimaryNodeID {
 			return ErrShardIsReplica
 		}
 	}

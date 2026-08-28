@@ -4,8 +4,8 @@ import validation "github.com/go-ozzo/ozzo-validation/v4"
 
 type CreateReplicationDto struct {
 	ProjectID     string `json:"project_id"`
-	ShardNodeID   string `json:"shard_node_id"`
-	ReplicaNodeID string `json:"replica_node_id"`
+	ShardID       string `json:"shard_id"`
+	StandbyNodeID string `json:"standby_node_id"`
 }
 
 type DeleteReplicationDto struct {
@@ -15,16 +15,16 @@ type DeleteReplicationDto struct {
 
 type PromoteReplicaDto struct {
 	RelationID    string `json:"relation_id"`
-	ShardNodeID   string `json:"shard_node_id"`
-	ReplicaNodeID string `json:"replica_node_id"`
+	ShardID       string `json:"shard_id"`
+	StandbyNodeID string `json:"standby_node_id"`
 }
 
 func (dto *CreateReplicationDto) ValidateCreate() error {
 	return validation.ValidateStruct(
 		dto,
 		validation.Field(&dto.ProjectID, validation.Required, validUUID),
-		validation.Field(&dto.ShardNodeID, validation.Required, validUUID),
-		validation.Field(&dto.ReplicaNodeID, validation.Required, validUUID),
+		validation.Field(&dto.ShardID, validation.Required, validUUID),
+		validation.Field(&dto.StandbyNodeID, validation.Required, validUUID),
 	)
 }
 
@@ -40,7 +40,7 @@ func (dto *PromoteReplicaDto) ValidatePromote() error {
 	return validation.ValidateStruct(
 		dto,
 		validation.Field(&dto.RelationID, validation.Required, validUUID),
-		validation.Field(&dto.ShardNodeID, validation.Required, validUUID),
-		validation.Field(&dto.ReplicaNodeID, validation.Required, validUUID),
+		validation.Field(&dto.ShardID, validation.Required, validUUID),
+		validation.Field(&dto.StandbyNodeID, validation.Required, validUUID),
 	)
 }

@@ -3,9 +3,8 @@ package dto
 import validation "github.com/go-ozzo/ozzo-validation/v4"
 
 type TopologyCreateDto struct {
-	ProjectID     string `json:"project_id"`
-	ShardNodeID   string `json:"shard_node_id"`
-	ReplicaNodeID string `json:"replica_node_id"`
+	ShardID       string `json:"shard_id"`
+	StandbyNodeID string `json:"standby_node_id"`
 }
 
 type TopologyDeleteDto struct {
@@ -15,9 +14,8 @@ type TopologyDeleteDto struct {
 
 func (dto *TopologyCreateDto) ValidateCreate() error {
 	return validation.ValidateStruct(dto,
-		validation.Field(&dto.ProjectID, validation.Required, validUUID),
-		validation.Field(&dto.ShardNodeID, validation.Required, validUUID),
-		validation.Field(&dto.ReplicaNodeID, validation.Required, validUUID),
+		validation.Field(&dto.ShardID, validation.Required, validUUID),
+		validation.Field(&dto.StandbyNodeID, validation.Required, validUUID),
 	)
 }
 

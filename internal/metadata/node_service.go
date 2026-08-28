@@ -34,14 +34,14 @@ func NewNodeService(
 func (s *NodeService) AddNode(
 	ctx context.Context,
 	projectID string,
-	nodeType string,
+	nodeRole string,
 	name string,
 ) (repository.Node, error) {
 
 	if err := s.validateAddNode(
 		ctx,
 		projectID,
-		nodeType,
+		nodeRole,
 		name,
 	); err != nil {
 		return repository.Node{}, err
@@ -50,7 +50,7 @@ func (s *NodeService) AddNode(
 	node, err := s.repo.NodeAdd(
 		ctx,
 		projectID,
-		nodeType,
+		nodeRole,
 		name,
 	)
 	if err != nil {
@@ -207,6 +207,10 @@ func (s *NodeService) UpdateNodeType(
 	nodeID string,
 	nodeType string,
 ) error {
+	return s.UpdateNodeRole(ctx, nodeID, nodeType)
+}
+
+func (s *NodeService) UpdateNodeRole(ctx context.Context, nodeID string, nodeRole string) error {
 
 	node, err := s.repo.NodeGetByID(
 		ctx,
@@ -216,18 +220,18 @@ func (s *NodeService) UpdateNodeType(
 		return err
 	}
 
-	if err := s.validateUpdateNodeType(
+	if err := s.validateUpdateNodeRole(
 		ctx,
 		node,
-		nodeType,
+		nodeRole,
 	); err != nil {
 		return err
 	}
 
-	if err := s.repo.NodeUpdateType(
+	if err := s.repo.NodeUpdateRole(
 		ctx,
 		nodeID,
-		nodeType,
+		nodeRole,
 	); err != nil {
 		return err
 	}

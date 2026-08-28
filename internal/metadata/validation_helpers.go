@@ -23,7 +23,7 @@ func ensureNodeOutsideTopology(
 	}
 
 	for _, topology := range topologies {
-		if topology.ShardNodeID == node.ID || topology.ReplicaNodeID == node.ID {
+		if topology.PrimaryNodeID == node.ID || topology.StandbyNodeID == node.ID {
 			return ErrNodeInTopology
 		}
 	}

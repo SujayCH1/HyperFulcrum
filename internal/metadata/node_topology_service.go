@@ -13,7 +13,12 @@ type TopologyService struct {
 	refresher *cache.CacheRefresher
 }
 
-func NewTpologyService(
+func topologyPrimaryNodeID(cacheManager *cache.CacheManager, shardID string) string {
+	shard, _ := cacheManager.Shards.GetByID(shardID)
+	return shard.PrimaryNodeID
+}
+
+func NewTopologyService(
 	repo *repository.NodeTopologyRepository,
 	cache *cache.CacheManager,
 	refresher *cache.CacheRefresher,
@@ -25,18 +30,24 @@ func NewTpologyService(
 	}
 }
 
+// NewTpologyService is retained for compatibility with older callers.
+func NewTpologyService(repo *repository.NodeTopologyRepository, cacheManager *cache.CacheManager,
+	refresher *cache.CacheRefresher) *TopologyService {
+	return NewTopologyService(repo, cacheManager, refresher)
+}
+
 func (s *TopologyService) CreateTopology(
 	ctx context.Context,
 	projectID string,
-	replicaID string,
 	shardID string,
+	standbyID string,
 ) (repository.NodeTopology, error) {
 
 	if err := s.validateCreateTopology(
 		ctx,
 		projectID,
-		replicaID,
 		shardID,
+		standbyID,
 	); err != nil {
 		return repository.NodeTopology{}, err
 	}
@@ -44,8 +55,8 @@ func (s *TopologyService) CreateTopology(
 	topology, err := s.repo.TopologyAdd(
 		ctx,
 		projectID,
-		shardID,
-		replicaID,
+		topologyPrimaryNodeID(s.cache, shardID),
+		standbyID,
 	)
 	if err != nil {
 		return repository.NodeTopology{}, err

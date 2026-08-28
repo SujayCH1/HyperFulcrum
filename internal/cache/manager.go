@@ -5,6 +5,8 @@ type CacheManager struct {
 	Nodes       *NodeStore
 	Connections *ConnectionStore
 	Topology    *NodeTopologyStore
+	Shards      *ShardStore
+	Runtime     *NodeRuntimeStateStore
 
 	Columns       *ColumnStore
 	FKEdges       *FKEdgesStore
@@ -18,6 +20,8 @@ func NewCacheManager() *CacheManager {
 		Nodes:       NewNodeStore(),
 		Connections: NewConnectionStore(),
 		Topology:    NewTopologyStore(),
+		Shards:      NewShardStore(),
+		Runtime:     NewNodeRuntimeStateStore(),
 
 		Columns:       NewColumnStore(),
 		FKEdges:       NewFKEdgesStore(),
@@ -31,6 +35,8 @@ func (m *CacheManager) DeleteProject(projectID string) {
 	m.Nodes.DeleteProject(projectID)
 	m.Connections.DeleteProject(projectID)
 	m.Topology.DeleteByProjectID(projectID)
+	m.Shards.DeleteProject(projectID)
+	m.Runtime.DeleteProject(projectID)
 	m.Columns.DeleteProject(projectID)
 	m.FKEdges.DeleteProject(projectID)
 	m.SchemaVersion.DeleteProject(projectID)
@@ -42,6 +48,8 @@ func (m *CacheManager) Clear() {
 	m.Nodes.Clear()
 	m.Connections.Clear()
 	m.Topology.Clear()
+	m.Shards.Clear()
+	m.Runtime.Clear()
 	m.Columns.Clear()
 	m.FKEdges.Clear()
 	m.SchemaVersion.Clear()

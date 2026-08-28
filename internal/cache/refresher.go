@@ -12,6 +12,8 @@ type CacheRefresher struct {
 	nodeRepo          *repository.NodeRepository
 	connectionRepo    *repository.NodeConnectionRepository
 	topologyRepo      *repository.NodeTopologyRepository
+	shardRepo         *repository.ShardRepository
+	runtimeRepo       *repository.NodeRuntimeStateRepository
 	columnRepo        *repository.ColumnRepository
 	fkRepo            *repository.FKEdgesRepository
 	schemaVersionRepo *repository.SchemaVersionRepository
@@ -25,6 +27,8 @@ type projectMetadata struct {
 	nodes         []repository.Node
 	connections   []repository.NodeConnection
 	topologies    []repository.NodeTopology
+	shards        []repository.Shard
+	runtimeStates []repository.NodeRuntimeState
 	columns       []repository.Column
 	edges         []repository.FkEdges
 	schemaVersion *repository.SchemaVersion
@@ -36,6 +40,8 @@ func NewCacheRefresher(
 	nodeRepo *repository.NodeRepository,
 	connectionRepo *repository.NodeConnectionRepository,
 	topologyRepo *repository.NodeTopologyRepository,
+	shardRepo *repository.ShardRepository,
+	runtimeRepo *repository.NodeRuntimeStateRepository,
 	columnRepo *repository.ColumnRepository,
 	fkRepo *repository.FKEdgesRepository,
 	schemaVersionRepo *repository.SchemaVersionRepository,
@@ -48,6 +54,8 @@ func NewCacheRefresher(
 		nodeRepo:          nodeRepo,
 		connectionRepo:    connectionRepo,
 		topologyRepo:      topologyRepo,
+		shardRepo:         shardRepo,
+		runtimeRepo:       runtimeRepo,
 		columnRepo:        columnRepo,
 		fkRepo:            fkRepo,
 		schemaVersionRepo: schemaVersionRepo,
@@ -194,6 +202,24 @@ func (r *CacheRefresher) RefreshTopology(
 	return nil
 }
 
+func (r *CacheRefresher) RefreshShards(ctx context.Context, projectID string) error {
+	shards, err := r.shardRepo.ShardList(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	r.cache.Shards.ReplaceProject(projectID, shards)
+	return nil
+}
+
+func (r *CacheRefresher) RefreshNodeRuntimeStates(ctx context.Context, projectID string) error {
+	states, err := r.runtimeRepo.RuntimeStateListByProject(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	r.cache.Runtime.ReplaceProject(projectID, states)
+	return nil
+}
+
 func (r *CacheRefresher) RefreshAllProjects(
 	ctx context.Context,
 ) error {
@@ -322,6 +348,16 @@ func (r *CacheRefresher) fetchProjectMetadata(
 		return projectMetadata{}, err
 	}
 
+	shards, err := r.shardRepo.ShardList(ctx, project.ID)
+	if err != nil {
+		return projectMetadata{}, err
+	}
+
+	runtimeStates, err := r.runtimeRepo.RuntimeStateListByProject(ctx, project.ID)
+	if err != nil {
+		return projectMetadata{}, err
+	}
+
 	columns, err := r.columnRepo.ColumnsListByProjectID(ctx, project.ID)
 	if err != nil {
 		return projectMetadata{}, err
@@ -343,13 +379,15 @@ func (r *CacheRefresher) fetchProjectMetadata(
 	}
 
 	metadata := projectMetadata{
-		project:     project,
-		nodes:       nodes,
-		connections: connections,
-		topologies:  topologies,
-		columns:     columns,
-		edges:       edges,
-		shardKeys:   shardKeys,
+		project:       project,
+		nodes:         nodes,
+		connections:   connections,
+		topologies:    topologies,
+		shards:        shards,
+		runtimeStates: runtimeStates,
+		columns:       columns,
+		edges:         edges,
+		shardKeys:     shardKeys,
 	}
 
 	if err == nil {
@@ -369,6 +407,8 @@ func (r *CacheRefresher) storeProjectMetadata(
 	r.cache.Nodes.ReplaceProject(projectID, metadata.nodes)
 	r.cache.Connections.ReplaceProject(projectID, metadata.connections)
 	r.cache.Topology.Set(projectID, metadata.topologies)
+	r.cache.Shards.ReplaceProject(projectID, metadata.shards)
+	r.cache.Runtime.ReplaceProject(projectID, metadata.runtimeStates)
 	r.cache.Columns.ReplaceProject(projectID, metadata.columns)
 	r.cache.FKEdges.ReplaceProject(projectID, metadata.edges)
 	r.cache.ShardKeys.ReplaceProject(projectID, metadata.shardKeys)

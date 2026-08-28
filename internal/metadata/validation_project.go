@@ -36,6 +36,14 @@ func (s *ProjectService) validateDeleteProject(
 		return ErrProjectHasTopology
 	}
 
+	if err := s.refresher.RefreshShards(ctx, projectID); err != nil {
+		return err
+	}
+	shards, _ := s.cache.Shards.GetByProject(projectID)
+	if len(shards) != 0 {
+		return ErrProjectHasShards
+	}
+
 	// Deferred until the corresponding state exists:
 	// - Project must not have pending schema execution.
 	// - Project must not have attached agents.

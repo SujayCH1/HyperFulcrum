@@ -9,12 +9,18 @@ import (
 )
 
 type NodeTopology struct {
-	RelationID    string `json:"relation_id"`
-	ProjectID     string `json:"project_id"`
-	ShardNodeID   string `json:"shard_node_id"`
-	ReplicaNodeID string `json:"replica_node_id"`
+	RelationID          string `json:"relation_id"`
+	ProjectID           string `json:"project_id"`
+	ShardID             string `json:"shard_id"`
+	PrimaryNodeID       string `json:"primary_node_id"`
+	StandbyNodeID       string `json:"standby_node_id"`
+	Status              string `json:"relationship_status"`
+	ReplicationSlotName string `json:"replication_slot_name,omitempty"`
+	ApplicationName     string `json:"application_name,omitempty"`
+	PromotionPriority   int    `json:"promotion_priority"`
 
 	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type NodeTopologyRepository struct {
@@ -30,7 +36,7 @@ func NewNodeTopologyRepo(conn *sql.DB) *NodeTopologyRepository {
 func (r *NodeTopologyRepository) TopologyAdd(
 	ctx context.Context,
 	projectID string,
-	shardID string,
+	primaryNodeID string,
 	replicaID string,
 ) (NodeTopology, error) {
 
@@ -39,27 +45,32 @@ func (r *NodeTopologyRepository) TopologyAdd(
 		(
 			relation_id,
 			project_id,
+			shard_id,
 			shard_node_id,
 			replica_node_id,
-			created_at
+			created_at,
+			updated_at
 		)
-		VALUES
-		($1, $2, $3, $4, $5)
-
+		SELECT $1, $2, shard.id, $3, $4, $5, $5
+		FROM shards AS shard
+		WHERE shard.project_id = $2 AND shard.primary_node_id = $3
+		RETURNING shard_id, relationship_status, updated_at
 	`
 
 	newUUID := uuid.New().String()
 	currTime := time.Now()
 
-	_, err := r.conn.ExecContext(
+	var logicalShardID, relationshipStatus string
+	var updatedAt time.Time
+	err := r.conn.QueryRowContext(
 		ctx,
 		query,
 		newUUID,
 		projectID,
-		shardID,
+		primaryNodeID,
 		replicaID,
 		currTime,
-	)
+	).Scan(&logicalShardID, &relationshipStatus, &updatedAt)
 	if err != nil {
 		return NodeTopology{}, err
 	}
@@ -67,9 +78,12 @@ func (r *NodeTopologyRepository) TopologyAdd(
 	return NodeTopology{
 		RelationID:    string(newUUID),
 		ProjectID:     projectID,
-		ShardNodeID:   shardID,
-		ReplicaNodeID: replicaID,
+		ShardID:       logicalShardID,
+		PrimaryNodeID: primaryNodeID,
+		StandbyNodeID: replicaID,
+		Status:        relationshipStatus,
 		CreatedAt:     currTime,
+		UpdatedAt:     updatedAt,
 	}, err
 
 }
@@ -109,7 +123,7 @@ func (r *NodeTopologyRepository) TopologyUpdate(
 	ctx context.Context,
 	relationID string,
 	projectID string,
-	shardID string,
+	primaryNodeID string,
 	replicaID string,
 ) error {
 
@@ -117,8 +131,11 @@ func (r *NodeTopologyRepository) TopologyUpdate(
 		UPDATE node_topology
 		SET
 			project_id = $2,
+			shard_id = (SELECT id FROM shards
+				WHERE project_id = $2 AND primary_node_id = $3),
 			shard_node_id = $3,
-			replica_node_id = $4
+			replica_node_id = $4,
+			updated_at = NOW()
 		WHERE relation_id = $1
 	`
 
@@ -127,7 +144,7 @@ func (r *NodeTopologyRepository) TopologyUpdate(
 		query,
 		relationID,
 		projectID,
-		shardID,
+		primaryNodeID,
 		replicaID,
 	)
 	if err != nil {
@@ -155,9 +172,15 @@ func (r *NodeTopologyRepository) TopologyGetAll(
 		SELECT
 			relation_id,
 			project_id,
+			shard_id,
 			shard_node_id,
 			replica_node_id,
-			created_at
+			relationship_status,
+			COALESCE(replication_slot_name, ''),
+			COALESCE(application_name, ''),
+			promotion_priority,
+			created_at,
+			updated_at
 		FROM node_topology
 		WHERE project_id = $1
 	`
@@ -181,9 +204,15 @@ func (r *NodeTopologyRepository) TopologyGetAll(
 		err := rows.Scan(
 			&topology.RelationID,
 			&topology.ProjectID,
-			&topology.ShardNodeID,
-			&topology.ReplicaNodeID,
+			&topology.ShardID,
+			&topology.PrimaryNodeID,
+			&topology.StandbyNodeID,
+			&topology.Status,
+			&topology.ReplicationSlotName,
+			&topology.ApplicationName,
+			&topology.PromotionPriority,
 			&topology.CreatedAt,
+			&topology.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -208,9 +237,15 @@ func (r *NodeTopologyRepository) TopologyGetByID(
 		SELECT
 			relation_id,
 			project_id,
+			shard_id,
 			shard_node_id,
 			replica_node_id,
-			created_at
+			relationship_status,
+			COALESCE(replication_slot_name, ''),
+			COALESCE(application_name, ''),
+			promotion_priority,
+			created_at,
+			updated_at
 		FROM node_topology
 		WHERE relation_id = $1
 	`
@@ -224,9 +259,15 @@ func (r *NodeTopologyRepository) TopologyGetByID(
 	).Scan(
 		&topology.RelationID,
 		&topology.ProjectID,
-		&topology.ShardNodeID,
-		&topology.ReplicaNodeID,
+		&topology.ShardID,
+		&topology.PrimaryNodeID,
+		&topology.StandbyNodeID,
+		&topology.Status,
+		&topology.ReplicationSlotName,
+		&topology.ApplicationName,
+		&topology.PromotionPriority,
 		&topology.CreatedAt,
+		&topology.UpdatedAt,
 	)
 
 	if err != nil {
@@ -238,7 +279,7 @@ func (r *NodeTopologyRepository) TopologyGetByID(
 
 func (r *NodeTopologyRepository) GetReplicasForShard(
 	ctx context.Context,
-	shardID string,
+	primaryNodeID string,
 ) ([]string, error) {
 
 	query := `
@@ -250,7 +291,7 @@ func (r *NodeTopologyRepository) GetReplicasForShard(
 	rows, err := r.conn.QueryContext(
 		ctx,
 		query,
-		shardID,
+		primaryNodeID,
 	)
 	if err != nil {
 		return nil, err
@@ -274,6 +315,33 @@ func (r *NodeTopologyRepository) GetReplicasForShard(
 	return replicas, rows.Err()
 }
 
+func (r *NodeTopologyRepository) GetStandbysForLogicalShard(
+	ctx context.Context,
+	shardID string,
+) ([]string, error) {
+	query := `
+		SELECT replica_node_id
+		FROM node_topology
+		WHERE shard_id = $1
+		ORDER BY promotion_priority, created_at
+	`
+	rows, err := r.conn.QueryContext(ctx, query, shardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	standbys := make([]string, 0)
+	for rows.Next() {
+		var standbyID string
+		if err := rows.Scan(&standbyID); err != nil {
+			return nil, err
+		}
+		standbys = append(standbys, standbyID)
+	}
+	return standbys, rows.Err()
+}
+
 func (r *NodeTopologyRepository) GetAllMappings(
 	ctx context.Context,
 ) ([]NodeTopology, error) {
@@ -282,9 +350,15 @@ func (r *NodeTopologyRepository) GetAllMappings(
 		SELECT
 			relation_id,
 			project_id,
+			shard_id,
 			shard_node_id,
 			replica_node_id,
-			created_at
+			relationship_status,
+			COALESCE(replication_slot_name, ''),
+			COALESCE(application_name, ''),
+			promotion_priority,
+			created_at,
+			updated_at
 		FROM node_topology
 	`
 
@@ -303,9 +377,15 @@ func (r *NodeTopologyRepository) GetAllMappings(
 		err := rows.Scan(
 			&topology.RelationID,
 			&topology.ProjectID,
-			&topology.ShardNodeID,
-			&topology.ReplicaNodeID,
+			&topology.ShardID,
+			&topology.PrimaryNodeID,
+			&topology.StandbyNodeID,
+			&topology.Status,
+			&topology.ReplicationSlotName,
+			&topology.ApplicationName,
+			&topology.PromotionPriority,
 			&topology.CreatedAt,
+			&topology.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err

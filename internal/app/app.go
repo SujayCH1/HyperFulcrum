@@ -32,6 +32,8 @@ type Application struct {
 	NodeRepo          *repository.NodeRepository
 	NodeConnRepo      *repository.NodeConnectionRepository
 	TopologyRepo      *repository.NodeTopologyRepository
+	ShardRepo         *repository.ShardRepository
+	RuntimeStateRepo  *repository.NodeRuntimeStateRepository
 	ColumnRepo        *repository.ColumnRepository
 	FKEdgesRepo       *repository.FKEdgesRepository
 	SchemaVersionRepo *repository.SchemaVersionRepository
@@ -46,6 +48,8 @@ type Application struct {
 	FKEdgesService        *metadata.FKEdgesService
 	SchemaVersionService  *metadata.SchemaVersionService
 	ShardKeysService      *metadata.ShardKeysService
+	ShardService          *metadata.ShardService
+	RuntimeStateService   *metadata.NodeRuntimeStateService
 
 	// replication services
 	ReplicationService *replication.ReplicationService
@@ -59,6 +63,8 @@ type Application struct {
 	NodeConnectionHandler *handlers.NodeConnectionHandler
 	NodeTopologyHandler   *handlers.TopologyHandler
 	ShardKeyHandler       *handlers.ShardKeyHandler
+	ShardHandler          *handlers.ShardHandler
+	RuntimeStateHandler   *handlers.NodeRuntimeStateHandler
 
 	// replication handlers
 	ReplicationHandler *handlers.ReplicationHandler
@@ -118,6 +124,8 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 	a.NodeRepo = repository.NewNodeRepository(a.database)
 	a.NodeConnRepo = repository.NewNodeConnectionRepository(a.database)
 	a.TopologyRepo = repository.NewNodeTopologyRepo(a.database)
+	a.ShardRepo = repository.NewShardRepository(a.database)
+	a.RuntimeStateRepo = repository.NewNodeRuntimeStateRepository(a.database)
 	a.ColumnRepo = repository.NewColumnRepository(a.database)
 	a.FKEdgesRepo = repository.NewFKEdgesRepository(a.database)
 	a.SchemaVersionRepo = repository.NewSchemaVersionRepository(a.database)
@@ -135,6 +143,8 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 		a.NodeRepo,
 		a.NodeConnRepo,
 		a.TopologyRepo,
+		a.ShardRepo,
+		a.RuntimeStateRepo,
 		a.ColumnRepo,
 		a.FKEdgesRepo,
 		a.SchemaVersionRepo,
@@ -199,7 +209,7 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 		a.ConnectionManager,
 	)
 
-	a.NodeTopologyService = metadata.NewTpologyService(
+	a.NodeTopologyService = metadata.NewTopologyService(
 		a.TopologyRepo,
 		a.CacheManager,
 		a.CacheRefresher,
@@ -225,6 +235,20 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 
 	a.ShardKeysService = metadata.NewShardKeysService(
 		a.ShardKeyRepo,
+		a.CacheManager,
+		a.CacheRefresher,
+	)
+
+	a.ShardService = metadata.NewShardService(
+		a.ShardRepo,
+		a.NodeRepo,
+		a.CacheManager,
+		a.CacheRefresher,
+	)
+
+	a.RuntimeStateService = metadata.NewNodeRuntimeStateService(
+		a.RuntimeStateRepo,
+		a.NodeRepo,
 		a.CacheManager,
 		a.CacheRefresher,
 	)
@@ -264,13 +288,16 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 		a.NodeConnectionService,
 	)
 
-	a.NodeTopologyHandler = handlers.NewTopoogyHandler(
+	a.NodeTopologyHandler = handlers.NewTopologyHandler(
 		a.NodeTopologyService,
 	)
 
 	a.ShardKeyHandler = handlers.NewShardKeyHandler(
 		a.ShardKeysService,
 	)
+
+	a.ShardHandler = handlers.NewShardHandler(a.ShardService)
+	a.RuntimeStateHandler = handlers.NewNodeRuntimeStateHandler(a.RuntimeStateService)
 
 	a.ReplicationHandler = handlers.NewReplicationHandler(
 		a.ReplicationService,
@@ -282,6 +309,8 @@ func (a *Application) Start(ctx context.Context) (startErr error) {
 		a.NodeHandler,
 		a.NodeConnectionHandler,
 		a.NodeTopologyHandler,
+		a.ShardHandler,
+		a.RuntimeStateHandler,
 		a.ShardKeyHandler,
 		a.ReplicationHandler,
 	)

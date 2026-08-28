@@ -11,13 +11,18 @@ type TopologyHandler struct {
 	service *metadata.TopologyService
 }
 
-func NewTopoogyHandler(
+func NewTopologyHandler(
 	service *metadata.TopologyService,
 ) *TopologyHandler {
 
 	return &TopologyHandler{
 		service: service,
 	}
+}
+
+// NewTopoogyHandler is retained for compatibility with older callers.
+func NewTopoogyHandler(service *metadata.TopologyService) *TopologyHandler {
+	return NewTopologyHandler(service)
 }
 
 func (h *TopologyHandler) CreateTopology(
@@ -37,9 +42,9 @@ func (h *TopologyHandler) CreateTopology(
 
 	topology, err := h.service.CreateTopology(
 		r.Context(),
-		payload.ProjectID,
-		payload.ReplicaNodeID,
-		payload.ShardNodeID,
+		r.PathValue("projectId"),
+		payload.ShardID,
+		payload.StandbyNodeID,
 	)
 
 	if err != nil {
@@ -91,6 +96,15 @@ func (h *TopologyHandler) DeleteTopology(
 		return
 	}
 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *TopologyHandler) DeleteTopologyByPath(w http.ResponseWriter, r *http.Request) {
+	err := h.service.DeleteTopology(r.Context(), r.PathValue("relationId"), r.PathValue("projectId"))
+	if err != nil {
+		writeHandlerError(w, "Topology not found", "Failed to delete topology", err)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

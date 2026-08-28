@@ -169,6 +169,8 @@ func TestCacheManagerDeletesProjectMetadata(t *testing.T) {
 		[]repository.NodeConnection{{NodeId: "node-1"}},
 	)
 	manager.Topology.Set("project-1", []repository.NodeTopology{})
+	manager.Shards.ReplaceProject("project-1", []repository.Shard{{ID: "shard-1"}})
+	manager.Runtime.ReplaceProject("project-1", []repository.NodeRuntimeState{{NodeID: "node-1"}})
 	manager.Columns.ReplaceProject("project-1", []repository.Column{})
 	manager.FKEdges.ReplaceProject("project-1", []repository.FkEdges{})
 	manager.SchemaVersion.SetMissing("project-1")
@@ -191,6 +193,14 @@ func TestCacheManagerDeletesProjectMetadata(t *testing.T) {
 		t.Fatal("topology cache state was not deleted")
 	}
 
+	if _, loaded := manager.Shards.GetByProject("project-1"); loaded {
+		t.Fatal("shard cache state was not deleted")
+	}
+
+	if _, ok := manager.Runtime.GetByNodeID("node-1"); ok {
+		t.Fatal("runtime state cache entry was not deleted")
+	}
+
 	if _, loaded := manager.Columns.GetByProject("project-1"); loaded {
 		t.Fatal("column cache state was not deleted")
 	}
@@ -201,5 +211,31 @@ func TestCacheManagerDeletesProjectMetadata(t *testing.T) {
 
 	if manager.SchemaVersion.Loaded("project-1") {
 		t.Fatal("schema version cache state was not deleted")
+	}
+}
+
+func TestShardStoreReplacesIndexes(t *testing.T) {
+	store := NewShardStore()
+	store.ReplaceProject("project-1", []repository.Shard{{ID: "shard-1"}})
+	store.ReplaceProject("project-1", []repository.Shard{{ID: "shard-2"}})
+
+	if _, ok := store.GetByID("shard-1"); ok {
+		t.Fatal("stale shard index was retained")
+	}
+	if shard, ok := store.GetByID("shard-2"); !ok || shard.ProjectID != "project-1" {
+		t.Fatal("replacement shard was not indexed")
+	}
+}
+
+func TestRuntimeStateStoreReplacesProject(t *testing.T) {
+	store := NewNodeRuntimeStateStore()
+	store.ReplaceProject("project-1", []repository.NodeRuntimeState{{NodeID: "node-1"}})
+	store.ReplaceProject("project-1", []repository.NodeRuntimeState{{NodeID: "node-2"}})
+
+	if _, ok := store.GetByNodeID("node-1"); ok {
+		t.Fatal("stale runtime state was retained")
+	}
+	if _, ok := store.GetByNodeID("node-2"); !ok {
+		t.Fatal("replacement runtime state was not stored")
 	}
 }
